@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class LoginPage extends StatelessWidget {
-  const LoginPage({Key? key}) : super(key: key);
+  const LoginPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +20,7 @@ class LoginPage extends StatelessWidget {
           ),
 
           /// Dark overlay
+          // ignore: deprecated_member_use
           Container(color: Colors.black.withOpacity(0.6)),
 
           /// Centered Content
