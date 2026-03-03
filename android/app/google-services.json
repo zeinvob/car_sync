@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "925167052954",
+    "project_id": "carsync-mi",
+    "storage_bucket": "carsync-mi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:925167052954:android:66201f31ea7d5c06905723",
+        "android_client_info": {
+          "package_name": "com.example.car_sync"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWU5m-Ky4Rta3TA2-MKE9VPW77x2HYAEg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
