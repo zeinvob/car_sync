@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'package:car_sync/features/auth/presentation/pages/signup_page.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
 import 'login_form_page.dart';
@@ -84,7 +84,14 @@ class LoginPage extends StatelessWidget {
                           width: double.infinity,
                           height: 55,
                           child: OutlinedButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SignUpPage(),
+                                )
+                              );
+                            },
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(
                                 color: AppColors.primary,
