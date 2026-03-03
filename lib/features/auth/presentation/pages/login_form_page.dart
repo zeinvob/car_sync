@@ -689,7 +689,7 @@ void _showForgotPasswordSheet() {
                               ),
                               GestureDetector(
                                 onTap: () {
-                                  Navigator.push(
+                                  Navigator.pushReplacement(
                                     context,
                                     MaterialPageRoute(builder: (context) => const SignUpPage()),
                                   );
