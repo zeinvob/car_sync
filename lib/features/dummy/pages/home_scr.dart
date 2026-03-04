@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
+import 'package:car_sync/features/auth/presentation/pages/login_form_page.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -44,17 +45,17 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await _authService.signOut();
 
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginFormPage()),
+          (route) => false, // This removes all previous routes
+        );
+      }
       print("Signed out successfully");
     } catch (e) {
       print("Sign out failed: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Failed to sign out: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+
     } finally {
       if (mounted) {
         setState(() {

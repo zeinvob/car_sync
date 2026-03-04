@@ -37,19 +37,19 @@ class _LoginFormPageState extends State<LoginFormPage> {
       _showErrorAlert("Email Required", "Please enter your email address");
       return false;
     }
-    
+
     if (_passwordController.text.trim().isEmpty) {
       _showErrorAlert("Password Required", "Please enter your password");
       return false;
     }
-    
+
     // Optional: Basic email format validation
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(_emailController.text.trim())) {
       _showErrorAlert("Invalid Email", "Please enter a valid email address");
       return false;
     }
-    
+
     return true;
   }
 
@@ -69,10 +69,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
               color: AppColors.primary,
             ),
           ),
-          content: Text(
-            message,
-            style: GoogleFonts.poppins(),
-          ),
+          content: Text(message, style: GoogleFonts.poppins()),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -106,10 +103,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
               color: Colors.green,
             ),
           ),
-          content: Text(
-            message,
-            style: GoogleFonts.poppins(),
-          ),
+          content: Text(message, style: GoogleFonts.poppins()),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -128,177 +122,168 @@ class _LoginFormPageState extends State<LoginFormPage> {
   }
 
   // Show forgot password bottom sheet
-void _showForgotPasswordSheet() {
-  _resetEmailController.clear(); // Clear previous input
-  
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (BuildContext context) {
-      return StatefulBuilder(
-        builder: (BuildContext context, StateSetter setSheetState) {
-          return Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(30),
-                topRight: Radius.circular(30),
+  void _showForgotPasswordSheet() {
+    _resetEmailController.clear(); // Clear previous input
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setSheetState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
               ),
-            ),
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom + 40, // Added extra 40px bottom padding
-              left: 24,
-              right: 24,
-              top: 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+              padding: EdgeInsets.only(
+                bottom:
+                    MediaQuery.of(context).viewInsets.bottom +
+                    40, // Added extra 40px bottom padding
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                
-                // Title
-                Text(
-                  "Reset Password",
-                  style: GoogleFonts.poppins(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
+                  const SizedBox(height: 20),
+
+                  // Title
+                  Text(
+                    "Reset Password",
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                
-                // Subtitle
-                Text(
-                  "Enter your email address and we'll send you a link to reset your password.",
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.grey[600],
+                  const SizedBox(height: 8),
+
+                  // Subtitle
+                  Text(
+                    "Enter your email address and we'll send you a link to reset your password.",
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Email field
-                Text(
-                  "Email",
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.primary,
+                  const SizedBox(height: 24),
+
+                  // Email field
+                  Text(
+                    "Email",
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _resetEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(
+                          Icons.email_outlined,
+                          color: AppColors.primary,
+                        ),
+                        hintText: "Enter your email",
+                        hintStyle: GoogleFonts.poppins(fontSize: 14),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Buttons
+                  Row(
+                    children: [
+                      // Cancel button
+                      Expanded(
+                        child: TextButton(
+                          onPressed: _isResetLoading
+                              ? null
+                              : () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.grey[300]!),
+                            ),
+                          ),
+                          child: Text(
+                            "Cancel",
+                            style: GoogleFonts.poppins(
+                              color: Colors.grey[700],
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Send button
+                      Expanded(
+                        child: GradientButton(
+                          text: _isResetLoading ? "" : "Send Link",
+                          onPressed: _isResetLoading
+                              ? null
+                              : () => _handleForgotPassword(setSheetState),
+                          height: 50, 
+                          borderRadius: 12,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ],
                   ),
-                  child: TextField(
-                    controller: _resetEmailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(Icons.email_outlined, color: AppColors.primary),
-                      hintText: "Enter your email",
-                      hintStyle: GoogleFonts.poppins(fontSize: 14),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Buttons
-                Row(
-                  children: [
-                    // Cancel button
-                    Expanded(
-                      child: TextButton(
-                        onPressed: _isResetLoading ? null : () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.grey[300]!),
-                          ),
-                        ),
-                        child: Text(
-                          "Cancel",
-                          style: GoogleFonts.poppins(
-                            color: Colors.grey[700],
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    
-                    // Send button
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isResetLoading ? null : () => _handleForgotPassword(setSheetState),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: _isResetLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : Text(
-                                "Send Link",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // Added extra space at the bottom
-                const SizedBox(height: 40), // Additional space after buttons
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
-}
+
+                  // Added extra space at the bottom
+                  const SizedBox(height: 40), // Additional space after buttons
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   // Handle forgot password
   Future<void> _handleForgotPassword(StateSetter setSheetState) async {
@@ -307,7 +292,7 @@ void _showForgotPasswordSheet() {
       _showErrorAlert("Email Required", "Please enter your email address");
       return;
     }
-    
+
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(_resetEmailController.text.trim())) {
       _showErrorAlert("Invalid Email", "Please enter a valid email address");
@@ -320,14 +305,12 @@ void _showForgotPasswordSheet() {
 
     try {
       // Call your AuthService method for password reset
-      await _authService.resetPassword(
-        _resetEmailController.text.trim(),
-      );
+      await _authService.resetPassword(_resetEmailController.text.trim());
 
       // Close the bottom sheet
       if (mounted) {
         Navigator.pop(context);
-        
+
         // Show success message
         _showSuccessAlert(
           "Email Sent",
@@ -336,10 +319,10 @@ void _showForgotPasswordSheet() {
       }
     } catch (e) {
       print("Password reset failed: $e");
-      
+
       // Custom error messages
       String errorMessage = "Failed to send reset email. Please try again.";
-      
+
       if (e.toString().contains('user-not-found')) {
         errorMessage = "No account found with this email address.";
       } else if (e.toString().contains('invalid-email')) {
@@ -347,7 +330,7 @@ void _showForgotPasswordSheet() {
       } else if (e.toString().contains('network-request-failed')) {
         errorMessage = "Network error. Please check your internet connection.";
       }
-      
+
       if (mounted) {
         _showErrorAlert("Reset Failed", errorMessage);
       }
@@ -389,10 +372,11 @@ void _showForgotPasswordSheet() {
       }
     } catch (e) {
       print("Login failed: $e");
-      
+
       // Custom error messages based on Firebase error codes
-      String errorMessage = "Could not log in. Please check your credentials and try again.";
-      
+      String errorMessage =
+          "Could not log in. Please check your credentials and try again.";
+
       if (e.toString().contains('user-not-found')) {
         errorMessage = "No account found with this email address.";
       } else if (e.toString().contains('wrong-password')) {
@@ -406,7 +390,7 @@ void _showForgotPasswordSheet() {
       } else if (e.toString().contains('network-request-failed')) {
         errorMessage = "Network error. Check your connection.";
       }
-      
+
       if (mounted) {
         _showErrorAlert("Login Failed", errorMessage);
       }
@@ -422,16 +406,13 @@ void _showForgotPasswordSheet() {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     return Scaffold(
       body: Stack(
         children: [
           /// Background
           SizedBox.expand(
-            child: Image.asset(
-              "assets/images/login_bg.png",
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset("assets/images/login_bg.png", fit: BoxFit.cover),
           ),
 
           /// Overlay
@@ -441,9 +422,7 @@ void _showForgotPasswordSheet() {
           if (_isLoading)
             Container(
               color: Colors.black.withOpacity(0.3),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: const Center(child: CircularProgressIndicator()),
             ),
 
           /// Main Content
@@ -513,7 +492,10 @@ void _showForgotPasswordSheet() {
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.email_outlined, color: AppColors.primary),
+                                prefixIcon: const Icon(
+                                  Icons.email_outlined,
+                                  color: AppColors.primary,
+                                ),
                                 hintText: "Enter your email",
                                 hintStyle: GoogleFonts.poppins(fontSize: 14),
                                 filled: true,
@@ -522,7 +504,9 @@ void _showForgotPasswordSheet() {
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                               ),
                             ),
                           ),
@@ -554,10 +538,15 @@ void _showForgotPasswordSheet() {
                               controller: _passwordController,
                               obscureText: !_isPasswordVisible,
                               decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
+                                prefixIcon: const Icon(
+                                  Icons.lock_outline,
+                                  color: AppColors.primary,
+                                ),
                                 suffixIcon: IconButton(
                                   icon: Icon(
-                                    _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                                    _isPasswordVisible
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
                                     color: AppColors.primary,
                                   ),
                                   onPressed: () {
@@ -574,7 +563,9 @@ void _showForgotPasswordSheet() {
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                               ),
                             ),
                           ),
@@ -583,9 +574,12 @@ void _showForgotPasswordSheet() {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: _showForgotPasswordSheet, // Updated to show bottom sheet
+                              onPressed:
+                                  _showForgotPasswordSheet, // Updated to show bottom sheet
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                               ),
                               child: Text(
                                 "Forgot password?",
@@ -614,9 +608,13 @@ void _showForgotPasswordSheet() {
                           /// Divider with "Or"
                           Row(
                             children: [
-                              const Expanded(child: Divider(color: Colors.grey)),
+                              const Expanded(
+                                child: Divider(color: Colors.grey),
+                              ),
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
                                 child: Text(
                                   "Or",
                                   style: GoogleFonts.poppins(
@@ -625,7 +623,9 @@ void _showForgotPasswordSheet() {
                                   ),
                                 ),
                               ),
-                              const Expanded(child: Divider(color: Colors.grey)),
+                              const Expanded(
+                                child: Divider(color: Colors.grey),
+                              ),
                             ],
                           ),
 
@@ -640,7 +640,9 @@ void _showForgotPasswordSheet() {
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
@@ -691,7 +693,9 @@ void _showForgotPasswordSheet() {
                                 onTap: () {
                                   Navigator.pushReplacement(
                                     context,
-                                    MaterialPageRoute(builder: (context) => const SignUpPage()),
+                                    MaterialPageRoute(
+                                      builder: (context) => const SignUpPage(),
+                                    ),
                                   );
                                 },
                                 child: Text(

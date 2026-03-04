@@ -1,29 +1,32 @@
+// In your gradient_button.dart
 import 'package:flutter/material.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class GradientButton extends StatelessWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed; // Make nullable
   final double? width;
   final double height;
   final double borderRadius;
   final EdgeInsetsGeometry? padding;
+  final bool isLoading; // Add this
 
   const GradientButton({
     super.key,
     required this.text,
-    required this.onPressed,
+    this.onPressed,
     this.width,
     this.height = 55,
     this.borderRadius = 30,
     this.padding,
+    this.isLoading = false, // Default to false
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: width, // ← can be null (auto) or custom
+      width: width,
       height: height,
       child: Container(
         decoration: BoxDecoration(
@@ -36,13 +39,13 @@ class GradientButton extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.35),
-              blurRadius: 4,
-              offset: const Offset(0, 4),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: ElevatedButton(
-          onPressed: onPressed,
+          onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
             padding: padding,
             backgroundColor: Colors.transparent,
@@ -51,15 +54,24 @@ class GradientButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(borderRadius),
             ),
           ),
-          child: Text(
-            text,
-            style: GoogleFonts.poppins(
-              letterSpacing: 5,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-            ),
-          ),
+          child: isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Text(
+                  text,
+                  style: GoogleFonts.poppins(
+                    letterSpacing: 3,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
         ),
       ),
     );
