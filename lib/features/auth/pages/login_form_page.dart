@@ -1,12 +1,12 @@
-import 'package:car_sync/features/auth/presentation/pages/signup_page.dart';
+import 'package:car_sync/features/auth/pages/signup_page.dart';
 import 'package:car_sync/features/dummy/pages/home_scr.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
-import 'package:car_sync/features/auth/presentation/pages/verify_email_page.dart';
-import 'package:car_sync/features/auth/presentation/pages/complete_profile_page.dart';
+import 'package:car_sync/features/auth/pages/verify_email_page.dart';
+import 'package:car_sync/features/auth/pages/complete_profile_page.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 
 class LoginFormPage extends StatefulWidget {

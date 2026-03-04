@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:car_sync/core/services/storage_service.dart';
-import 'package:car_sync/features/auth/presentation/pages/login_form_page.dart';
+import 'package:car_sync/features/auth/pages/login_form_page.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;

@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
-import 'package:car_sync/features/auth/presentation/pages/login_form_page.dart';
-import 'package:car_sync/features/auth/presentation/pages/verify_email_page.dart';
+import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/features/auth/pages/verify_email_page.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
