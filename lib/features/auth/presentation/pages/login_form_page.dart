@@ -6,6 +6,7 @@ import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/custom_textfield.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
+import 'package:car_sync/features/auth/presentation/pages/verify_email_page.dart';
 
 class LoginFormPage extends StatefulWidget {
   const LoginFormPage({super.key});
@@ -266,7 +267,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
                           onPressed: _isResetLoading
                               ? null
                               : () => _handleForgotPassword(setSheetState),
-                          height: 50, 
+                          height: 50,
                           borderRadius: 12,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
@@ -347,7 +348,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
   Future<void> _handleLogin() async {
     // Validate inputs first
     if (!_validateInputs()) {
-      return; // Stop if validation fails
+      return;
     }
 
     setState(() {
@@ -355,27 +356,48 @@ class _LoginFormPageState extends State<LoginFormPage> {
     });
 
     try {
+      print("Calling signInWithEmail");
       final user = await _authService.signInWithEmail(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
 
-      if (user != null) {
-        print("User logged in: ${user.uid}");
-        // Navigate to home
+      // If we get here, login was successful!
+
+      if (user != null && mounted) {
+        print("Login successful! User: ${user.uid}");
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      } else {
+        // This shouldn't happen if no exception was thrown
+        print("User is null but no exception");
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          );
+          _showErrorAlert("Login Failed", "Unknown error occurred");
         }
       }
     } catch (e) {
-      print("Login failed: $e");
+      print("Login failed with error: $e");
 
-      // Custom error messages based on Firebase error codes
-      String errorMessage =
-          "Could not log in. Please check your credentials and try again.";
+      // Check for email not verified
+      if (e.toString().contains('email-not-verified')) {
+        print("Email not verified, navigating to verification page");
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  VerifyEmailPage(email: _emailController.text.trim()),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Handle other Firebase errors
+      String errorMessage = "Could not log in. Please check your credentials.";
 
       if (e.toString().contains('user-not-found')) {
         errorMessage = "No account found with this email address.";

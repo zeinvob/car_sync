@@ -4,6 +4,7 @@ import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
 import 'package:car_sync/features/auth/presentation/pages/login_form_page.dart';
+import 'package:car_sync/features/auth/presentation/pages/verify_email_page.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -227,7 +228,6 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-
   // Handle sign up
   Future<void> _handleSignUp() async {
     if (!_validateInputs()) {
@@ -247,12 +247,15 @@ class _SignUpPageState extends State<SignUpPage> {
         dateOfBirth: _selectedDate!,
       );
 
+      // In _handleSignUp method, after successful signup
       if (user != null && mounted) {
-        // Sign out the user so they have to log in manually
-        await _authService.signOut();
-        // Show success message
-        _showSuccessAlert(
-          "Account created successfully! Please login to continue.",
+        // Navigate to verification page
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                VerifyEmailPage(email: _emailController.text.trim()),
+          ),
         );
       }
     } catch (e) {

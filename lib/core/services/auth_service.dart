@@ -13,20 +13,80 @@ class AuthService {
   // Sign in with email & password
   Future<User?> signInWithEmail(String email, String password) async {
     try {
+      print("🔄 Attempting login for: $email");
+
       UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      return result.user;
+
+      User? user = result.user;
+
+      // Check if email is verified
+      if (user != null) {
+        // Reload to get latest emailVerified status
+        await user.reload();
+        user = _auth.currentUser;
+
+        if (user != null && !user.emailVerified) {
+          print("Email not verified: $email");
+          await _auth.signOut();
+          throw Exception('email-not-verified');
+        }
+
+        print("Login successful for: ${user?.email}");
+        return user; // Return the user on success
+      }
+
+      return null;
     } on FirebaseAuthException catch (e) {
-      print(
-        "FirebaseAuthException in signInWithEmail: ${e.code} - ${e.message}",
-      );
-      // Re-throw to be handled by the UI
-      throw e;
+      print("FirebaseAuthException: ${e.code}");
+      throw e; // Re-throw to be handled by UI
     } catch (e) {
-      print("Unexpected error in signInWithEmail: $e");
-      throw Exception('An unexpected error occurred');
+      print("Unexpected error: $e");
+      throw e;
+    }
+  }
+
+  Future<void> resendVerificationEmail() async {
+    try {
+      User? user = _auth.currentUser;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+        print("Verification email resent to: ${user.email}");
+      } else if (user == null) {
+        throw Exception('No user is currently signed in');
+      } else {
+        throw Exception('Email is already verified');
+      }
+    } catch (e) {
+      print("Error resending verification: $e");
+      throw e;
+    }
+  }
+
+  // MARK: - Check Email Verification Status
+  Future<bool> checkEmailVerification() async {
+    try {
+      User? user = _auth.currentUser;
+      if (user != null) {
+        await user.reload();
+        user = _auth.currentUser;
+
+        bool isVerified = user?.emailVerified ?? false;
+
+        // Update Firestore if verification status changed
+        if (isVerified && user != null) {
+          await _storageService.updateEmailVerified(user.uid, true);
+        }
+
+        print("Email verified: $isVerified");
+        return isVerified;
+      }
+      return false;
+    } catch (e) {
+      print("Error checking verification: $e");
+      return false;
     }
   }
 
@@ -39,7 +99,7 @@ class AuthService {
     required DateTime dateOfBirth,
   }) async {
     try {
-      // STEP 1: Create user in Firebase Auth
+      // Create user in Firebase Auth
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -48,9 +108,14 @@ class AuthService {
       User? user = result.user;
 
       if (user != null) {
-        // update display name
+        // Update display name
         await user.updateDisplayName(fullName);
 
+        // SEND EMAIL VERIFICATION
+        await user.sendEmailVerification();
+        print("Verification email sent to: $email");
+
+        // Save user data to Firestore
         try {
           await _storageService.saveUserData(
             uid: user.uid,
@@ -58,16 +123,18 @@ class AuthService {
             fullName: fullName,
             phone: phone,
             dateOfBirth: dateOfBirth,
+            emailVerified: false, // Track verification status
           );
           print("User data saved to Firestore");
         } catch (storageError) {
-          // Storage failed but Auth succeeded
-          print(
-            "Warning: User created but data not saved to Firestore: $storageError",
-          );
+          print("Warning: User created but data not saved: $storageError");
         }
-        await user.reload();
-        print("User created successfully in Auth: ${user.uid}");
+
+        // Sign out so user must verify before logging in
+        await _auth.signOut();
+        print("User signed out - must verify email before login");
+
+        return user;
       }
 
       return user;
@@ -120,20 +187,33 @@ class AuthService {
   }
 
   // Firebase exceptions
-  String _handleAuthException(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'user-not-found':
-        return 'No user found with this email.';
-      case 'wrong-password':
-        return 'Wrong password.';
-      case 'email-already-in-use':
-        return 'Email already in use.';
-      case 'weak-password':
-        return 'Password is too weak.';
-      case 'invalid-email':
-        return 'Invalid email address.';
-      default:
-        return 'Authentication failed: ${e.message}';
+  String getErrorMessage(dynamic error) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'email-already-in-use':
+          return 'This email is already registered. Please login instead.';
+        case 'invalid-email':
+          return 'Please enter a valid email address.';
+        case 'weak-password':
+          return 'Password is too weak. Please use at least 6 characters.';
+        case 'user-not-found':
+          return 'No account found with this email.';
+        case 'wrong-password':
+          return 'Incorrect password. Please try again.';
+        case 'network-request-failed':
+          return 'Network error. Please check your internet connection.';
+        default:
+          return 'Error: ${error.message}';
+      }
+    } else if (error.toString().contains('email-not-verified')) {
+      return 'Please verify your email before logging in. Check your inbox.';
     }
+    return 'An unexpected error occurred. Please try again.';
   }
+
+  // MARK: - Getters
+  bool get isUserLoggedIn => _auth.currentUser != null;
+  String? get currentUserEmail => _auth.currentUser?.email;
+  String? get currentUserDisplayName => _auth.currentUser?.displayName;
+  bool get isCurrentUserVerified => _auth.currentUser?.emailVerified ?? false;
 }
