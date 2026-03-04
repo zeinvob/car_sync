@@ -5,13 +5,51 @@ import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
 import 'login_form_page.dart';
 
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1), // Start from bottom
+      end: Offset.zero, // End at normal position
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    _controller.forward(); // Start animation
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final contentWidth = screenWidth > 600 ? 500.0 : screenWidth;
+    final contentWidth =
+        screenWidth > 600 ? 500.0 : screenWidth;
 
     return Scaffold(
       body: Stack(
@@ -25,7 +63,6 @@ class LoginPage extends StatelessWidget {
           ),
 
           /// Overlay
-          // ignore: deprecated_member_use
           Container(color: Colors.black.withOpacity(0.6)),
 
           /// Content
@@ -47,71 +84,76 @@ class LoginPage extends StatelessWidget {
 
                   const Spacer(),
 
-                  /// Bottom Card
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 80,
-                    ),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF5F6F8),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(40),
-                        topRight: Radius.circular(40),
+                  /// Animated Bottom Card
+                  SlideTransition(
+                    position: _slideAnimation,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 30,
+                        vertical: 80,
                       ),
-                    ),
-                    child: Column(
-                      children: [
-                        /// LOGIN BUTTON (Reusable)
-                        GradientButton(
-                          width: double.infinity,
-                          text: "LOGIN",
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const LoginFormPage(),
-                              ),
-                            );
-                          },
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF5F6F8),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(40),
+                          topRight: Radius.circular(40),
                         ),
-
-                        const SizedBox(height: 20),
-
-                        /// SIGN UP BUTTON
-                        SizedBox(
-                          width: double.infinity,
-                          height: 55,
-                          child: OutlinedButton(
+                      ),
+                      child: Column(
+                        children: [
+                          /// LOGIN BUTTON
+                          GradientButton(
+                            width: double.infinity,
+                            text: "LOGIN",
                             onPressed: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const SignUpPage(),
-                                )
+                                  builder: (_) =>
+                                      const LoginFormPage(),
+                                ),
                               );
                             },
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                color: AppColors.primary,
-                                width: 1.5,
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          /// SIGN UP BUTTON
+                          SizedBox(
+                            width: double.infinity,
+                            height: 55,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const SignUpPage(),
+                                  ),
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: AppColors.primary,
+                                  width: 1.5,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(30),
+                                ),
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                            ),
-                            child: Text(
-                              "SIGN UP",
-                              style: GoogleFonts.poppins(
-                                letterSpacing: 3,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
+                              child: Text(
+                                "SIGN UP",
+                                style: GoogleFonts.poppins(
+                                  letterSpacing: 3,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],

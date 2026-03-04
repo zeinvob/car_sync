@@ -5,10 +5,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:car_sync/features/auth/presentation/pages/login_form_page.dart';
 import 'package:car_sync/features/dummy/pages/home_scr.dart';
 import 'package:car_sync/features/splash/presentation/pages/video_splash_scr.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
