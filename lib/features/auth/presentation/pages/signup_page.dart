@@ -239,7 +239,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
     try {
       // Create user in Firebase Auth and save data to Firestore
-      final user = await _authService.signUpWithEmail(
+      final user = await _authService.customerSignUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         fullName: _fullNameController.text.trim(),

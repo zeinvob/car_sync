@@ -363,19 +363,32 @@ class _LoginFormPageState extends State<LoginFormPage> {
       );
 
       // If we get here, login was successful!
-
       if (user != null && mounted) {
         print("Login successful! User: ${user.uid}");
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-      } else {
-        // This shouldn't happen if no exception was thrown
-        print("User is null but no exception");
-        if (mounted) {
-          _showErrorAlert("Login Failed", "Unknown error occurred");
+        // Get user role from Firestore
+        String? userRole = await _authService.getCurrentUserRole();
+        print("User role: $userRole");
+
+        // Navigate to appropriate home screen based on role
+        if (userRole == 'admin') {
+          // Navigate to Admin Home Screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        } else if (userRole == 'technician') {
+          // Navigate to Technician Home Screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        } else {
+          // Default to Customer Home Screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
         }
       }
     } catch (e) {
