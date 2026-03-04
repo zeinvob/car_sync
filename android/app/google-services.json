@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "925167052954-668rdebt40ifuhm8f78bpkg778c8kpsa.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.car_sync",
+            "certificate_hash": "13b036f80e3b54034f6f2a68a888430e3cf0057f"
+          }
+        },
+        {
           "client_id": "925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +37,13 @@
             {
               "client_id": "925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "925167052954-pugptg2sg2k3e88bhkq04ht13aeij09p.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.carSync"
+              }
             }
           ]
         }

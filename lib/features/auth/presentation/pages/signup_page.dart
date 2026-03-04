@@ -14,9 +14,9 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  final AuthService _authService = AuthService();
-
-  // Controllers for form fields
+  final AuthService _authService = AuthService(
+    clientId: '925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com',
+  ); // client ID 
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();

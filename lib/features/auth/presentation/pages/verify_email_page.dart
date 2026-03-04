@@ -15,7 +15,9 @@ class VerifyEmailPage extends StatefulWidget {
 }
 
 class _VerifyEmailPageState extends State<VerifyEmailPage> {
-  final AuthService _authService = AuthService();
+  final AuthService _authService = AuthService(
+    clientId: '925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com',
+  ); // client ID 
   bool _isResending = false;
   bool _isChecking = false;
 

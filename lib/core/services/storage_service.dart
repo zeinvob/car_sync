@@ -7,6 +7,84 @@ class StorageService {
   // Collection references
   CollectionReference get _usersCollection => _firestore.collection('users');
 
+  // Check if user exists in Firestore
+  Future<bool> userExists(String uid) async {
+    try {
+      DocumentSnapshot doc = await _usersCollection.doc(uid).get();
+      return doc.exists;
+    } catch (e) {
+      print("Error checking user existence: $e");
+      return false;
+    }
+  }
+
+  // Save Google user data (minimal data - no phone/dob)
+  Future<void> saveGoogleUserData({
+    required String uid,
+    required String email,
+    required String fullName,
+  }) async {
+    try {
+      await _usersCollection.doc(uid).set({
+        'uid': uid,
+        'email': email,
+        'fullName': fullName,
+        'role': 'customer', // Default role
+        'emailVerified': true, // Google emails are verified
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      print("Google user data saved for UID: $uid");
+    } catch (e) {
+      print("Error saving Google user data: $e");
+      throw e;
+    }
+  }
+
+  // Check if Google user has complete profile (has phone and dateOfBirth)
+  Future<bool> needsProfileCompletion(String uid) async {
+    try {
+      DocumentSnapshot doc = await _usersCollection.doc(uid).get();
+      if (doc.exists) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+        // Check if phone and dateOfBirth fields exist
+        bool hasPhone =
+            data.containsKey('phone') &&
+            data['phone'] != null &&
+            data['phone'].toString().isNotEmpty;
+        bool hasDob =
+            data.containsKey('dateOfBirth') && data['dateOfBirth'] != null;
+
+        // If either is missing, profile needs completion
+        return !hasPhone || !hasDob;
+      }
+      return true; // If no document, needs completion
+    } catch (e) {
+      print("Error checking profile completion: $e");
+      return true;
+    }
+  }
+
+  // Complete profile with phone and date of birth
+  Future<void> completeUserProfile({
+    required String uid,
+    required String phone,
+    required DateTime dateOfBirth,
+  }) async {
+    try {
+      await _usersCollection.doc(uid).update({
+        'phone': phone,
+        'dateOfBirth': Timestamp.fromDate(dateOfBirth),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      print("User profile completed for UID: $uid");
+    } catch (e) {
+      print("Error completing user profile: $e");
+      throw e;
+    }
+  }
+
   // Save customer data (for self-registration)
   Future<void> saveCustomerData({
     required String uid,
@@ -85,7 +163,7 @@ class StorageService {
       QuerySnapshot snapshot = await _usersCollection
           .where('role', isEqualTo: 'foreman')
           .get();
-      
+
       return snapshot.docs.map((doc) {
         return doc.data() as Map<String, dynamic>;
       }).toList();
