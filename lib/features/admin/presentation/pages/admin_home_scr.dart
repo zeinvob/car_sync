@@ -1,8 +1,12 @@
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
+import 'package:car_sync/core/widgets/gradient_button.dart';
+import 'package:car_sync/core/services/auth_service.dart';
+import 'package:car_sync/features/auth/pages/login_form_page.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -13,167 +17,146 @@ class AdminHomeScreen extends StatefulWidget {
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final StorageService _storageService = StorageService();
+  final AuthService _authService = AuthService();
+  bool _isSigningOut = false;
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light, // Android icons white
+        statusBarBrightness: Brightness.dark, // iOS icons white
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
-      /*_buildDashboardPage()*/
-      const Center(child: Text("Bookings Page")),
-      const Center(child: Text("Services Page")),
-      const Center(child: Text("Stock Page")),
-      const Center(child: Text("Profile Page")),
+      _buildHomePage(),
+      const _SimplePage(title: "Bookings Page"),
+      const _SimplePage(title: "Services Page"),
+      const _SimplePage(title: "Stock Page"),
+      const _SimplePage(title: "Profile Page"),
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6F8),
-      body: pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: Colors.grey,
-        selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        unselectedLabelStyle: GoogleFonts.poppins(),
-        type: BottomNavigationBarType.fixed,
-        onTap: (value) {
-          setState(() => _selectedIndex = value);
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            label: "Home",
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Stack(
+        children: [
+          pages[_selectedIndex],
+
+          if (_isSigningOut)
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+        ],
+      ),
+      bottomNavigationBar: _buildGradientBottomNav(),
+    );
+  }
+
+  Widget _buildHomePage() {
+    return Column(
+      children: [
+        _buildTopHeader(),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeroBanner(),
+                const SizedBox(height: 20),
+
+                _buildSectionTitle("RECENTLY ADDED"),
+                const SizedBox(height: 12),
+                _buildRecentlyAddedSection(),
+
+                const SizedBox(height: 24),
+                _buildSectionTitle("WORKSHOP"),
+                const SizedBox(height: 12),
+                _buildWorkshopSection(),
+
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            label: "Bookings",
+        ),
+      ],
+    );
+  }
+
+  // ---------------- TOP HEADER ----------------
+
+  Widget _buildTopHeader() {
+    final top = MediaQuery.of(context).padding.top;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(18, top + 10, 18, 14), // top + your spacing
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.gradientStart, AppColors.gradientEnd],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(22),
+          bottomRight: Radius.circular(22),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.menu, color: Colors.white, size: 30),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.build_outlined),
-            label: "Services",
+          Row(
+            children: [
+              const Icon(Icons.directions_car, color: Colors.white, size: 28),
+              const SizedBox(width: 8),
+              Text(
+                "CS",
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            label: "Stock",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: "Profile",
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: IconButton(
+              onPressed: _isSigningOut ? null : _handleSignOut,
+              icon: const Icon(Icons.logout, color: Colors.white, size: 22),
+              tooltip: 'Sign Out',
+            ),
           ),
         ],
       ),
     );
   }
 
-  /*Widget _buildDashboardPage() {
-    return SafeArea(
-      child: FutureBuilder<Map<String, dynamic>>(
-        future: _storageService.getAdminDashboardData(),
-        builder: (context, snapshot) {
-          final data = snapshot.data ?? {};
+  // ---------------- HERO BANNER ----------------
 
-          final todayBookings = data['todayBookings'] ?? 0;
-          final carsInService = data['carsInService'] ?? 0;
-          final completedServices = data['completedServices'] ?? 0;
-          final activeTowing = data['activeTowingRequests'] ?? 0;
-          final todayRevenue = data['todayRevenue'] ?? 0.0;
-          final lowStockItems = data['lowStockItems'] ?? 0;
-          final appointments = List<Map<String, dynamic>>.from(
-            data['appointments'] ?? [],
-          );
-          final statusOverview = Map<String, int>.from(
-            data['statusOverview'] ?? {},
-          );
-          final alerts = List<String>.from(data['alerts'] ?? []);
-          final recentActivities = List<String>.from(
-            data['recentActivities'] ?? [],
-          );
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildWelcomeCard(todayBookings),
-                const SizedBox(height: 16),
-
-                GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.45,
-                  children: [
-                    _summaryCard(
-                      "Today's Bookings",
-                      todayBookings.toString(),
-                      Icons.calendar_today_outlined,
-                    ),
-                    _summaryCard(
-                      "Cars In Service",
-                      carsInService.toString(),
-                      Icons.car_repair_outlined,
-                    ),
-                    _summaryCard(
-                      "Completed",
-                      completedServices.toString(),
-                      Icons.check_circle_outline,
-                    ),
-                    _summaryCard(
-                      "Towing Requests",
-                      activeTowing.toString(),
-                      Icons.local_shipping_outlined,
-                    ),
-                    _summaryCard(
-                      "Revenue",
-                      "RM ${todayRevenue.toStringAsFixed(2)}",
-                      Icons.payments_outlined,
-                    ),
-                    _summaryCard(
-                      "Low Stock",
-                      lowStockItems.toString(),
-                      Icons.warning_amber_rounded,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-                _sectionTitle("Today's Appointments"),
-                const SizedBox(height: 10),
-                ...appointments.map((item) => _appointmentTile(item)).toList(),
-
-                const SizedBox(height: 20),
-                _sectionTitle("Service Status Overview"),
-                const SizedBox(height: 10),
-                _statusCard(statusOverview),
-
-                const SizedBox(height: 20),
-                _sectionTitle("Alerts / Notifications"),
-                const SizedBox(height: 10),
-                _alertsCard(alerts),
-
-                const SizedBox(height: 20),
-                _sectionTitle("Quick Actions"),
-                const SizedBox(height: 10),
-                _quickActions(),
-
-                const SizedBox(height: 20),
-                _sectionTitle("Recent Activity"),
-                const SizedBox(height: 10),
-                _recentActivityCard(recentActivities),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildWelcomeCard(int bookings) {
-    final now = DateTime.now();
+  Widget _buildHeroBanner() {
     return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      height: 180,
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         gradient: const LinearGradient(
@@ -182,243 +165,530 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           end: Alignment.bottomRight,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Text(
-            "Welcome, Admin",
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Opacity(
+                opacity: 0.18,
+                child: Image.network(
+                  "https://images.unsplash.com/photo-1503376780353-7e6692767b70",
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            DateFormat("EEEE, dd MMM yyyy • hh:mm a").format(now),
-            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            "You have $bookings bookings today.",
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryCard(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.primary),
-          const Spacer(),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _appointmentTile(Map<String, dynamic> item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "${item['time'] ?? '-'} • ${item['customerName'] ?? '-'}",
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "${item['carPlate'] ?? '-'} | ${item['serviceType'] ?? '-'} | ${item['status'] ?? '-'}",
-            style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700]),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            children: [
-              _smallActionButton("Assign"),
-              _smallActionButton("Check-in"),
-              _smallActionButton("Details"),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _smallActionButton(String text) {
-    return OutlinedButton(
-      onPressed: () {},
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: AppColors.primary),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-      child: Text(
-        text,
-        style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 12),
-      ),
-    );
-  }
-
-  Widget _statusCard(Map<String, int> statusOverview) {
-    final entries = statusOverview.entries.toList();
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        children: entries.map((e) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(e.key, style: GoogleFonts.poppins()),
                 Text(
-                  e.value.toString(),
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                  "Admin Home",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Manage spare parts, workshops, and bookings in one place.",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 13,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    "View Details",
+                    style: GoogleFonts.poppins(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
-          );
-        }).toList(),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _alertsCard(List<String> alerts) {
+  // ---------------- SECTION TITLE ----------------
+
+  Widget _buildSectionTitle(String title) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Text(
+        title,
+        style: GoogleFonts.poppins(
+          color: onSurface,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+
+  // ---------------- RECENTLY ADDED ----------------
+
+  Widget _buildRecentlyAddedSection() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _storageService.getRecentSpareParts(),
+      builder: (context, snapshot) {
+        final items = snapshot.data ?? [];
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (items.isEmpty) {
+          return _buildEmptyMessage("No spare parts found.");
+        }
+
+        return SizedBox(
+          height: 290,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return _buildProductCard(
+                title: item['part'] ?? 'No Part',
+                subtitle: item['car_model'] ?? 'No Model',
+                price: "RM ${item['price'] ?? 0}",
+                stock: item['stock'] ?? 0,
+                onTap: () {},
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // ---------------- WORKSHOP ----------------
+
+  Widget _buildWorkshopSection() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _storageService.getWorkshopList(),
+      builder: (context, snapshot) {
+        final items = snapshot.data ?? [];
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (items.isEmpty) {
+          return _buildEmptyMessage("No workshops found.");
+        }
+
+        return SizedBox(
+          height: 275,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (context, index) {
+              final item = items[index];
+
+              return _buildWorkshopCard(
+                title: item['name'] ?? 'Workshop',
+                subtitle: item['address'] ?? 'No address',
+                bookingCount: item['bookingCount'] ?? 0,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WorkshopBookingsPage(
+                        workshopId: item['id'],
+                        workshopName: item['name'] ?? 'Workshop',
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // ---------------- PRODUCT CARD ----------------
+
+  Widget _buildProductCard({
+    required String title,
+    required String subtitle,
+    required String price,
+    required int stock,
+    required VoidCallback onTap,
+  }) {
+    final cardColor = Theme.of(context).cardColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    final lowStock = stock <= 5;
+
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      width: 195, // ✅ same as workshop card
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: alerts.isEmpty
-            ? [
-                Text(
-                  "No alerts for now.",
-                  style: GoogleFonts.poppins(color: Colors.grey[600]),
-                ),
-              ]
-            : alerts
-                  .map(
-                    (alert) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text("⚠ $alert", style: GoogleFonts.poppins()),
-                    ),
-                  )
-                  .toList(),
-      ),
-    );
-  }
-
-  Widget _quickActions() {
-    final actions = [
-      "Add Booking",
-      "Check-in Vehicle",
-      "Assign Foreman",
-      "Generate Invoice",
-      "Add Stock",
-      "Request Towing",
-    ];
-
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: actions
-          .map(
-            (action) => ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                action,
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+        children: [
+          Container(
+            height: 110, // ✅ same as workshop card
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: onSurface.withOpacity(0.06),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
               ),
             ),
-          )
-          .toList(),
+            child: const Icon(
+              Icons.build_circle_outlined, // ✅ product icon
+              size: 46,
+              color: AppColors.primary,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+            child: Column(
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 2, // ✅ same style as workshop
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: onSurface.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // ✅ Badge like workshop card
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: onSurface.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    lowStock ? "Low Stock: $stock" : "Stock: $stock",
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: lowStock ? Colors.red : onSurface,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                // ✅ Price line under badge (still clean)
+                Text(
+                  price,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.all(10),
+            child: GradientButton(
+              text: "Add",
+              height: 45,
+              borderRadius: 12,
+              onPressed: onTap,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _recentActivityCard(List<String> activities) {
+  // ---------------- WORKSHOP CARD ----------------
+
+  Widget _buildWorkshopCard({
+    required String title,
+    required String subtitle,
+    required int bookingCount,
+    required VoidCallback onTap,
+  }) {
+    final cardColor = Theme.of(context).cardColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      width: 195,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: activities.isEmpty
-            ? [
+        children: [
+          Container(
+            height: 110,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: onSurface.withOpacity(0.06),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+            ),
+            child: const Icon(
+              Icons.garage_outlined,
+              size: 46,
+              color: AppColors.primary,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+            child: Column(
+              children: [
                 Text(
-                  "No recent activity.",
-                  style: GoogleFonts.poppins(color: Colors.grey[600]),
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: onSurface,
+                  ),
                 ),
-              ]
-            : activities
-                  .map(
-                    (activity) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text("• $activity", style: GoogleFonts.poppins()),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: onSurface.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: onSurface.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    "$bookingCount bookings",
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: onSurface,
                     ),
-                  )
-                  .toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.all(10),
+            child: GradientButton(
+              text: "Open",
+              height: 45,
+              borderRadius: 12,
+              onPressed: onTap,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.poppins(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        color: AppColors.primary,
+  // ---------------- EMPTY ----------------
+
+  Widget _buildEmptyMessage(String text) {
+    final cardColor = Theme.of(context).cardColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          text,
+          style: GoogleFonts.poppins(color: onSurface.withOpacity(0.7)),
+        ),
       ),
     );
-  }*/
+  }
+
+  // ---------------- GRADIENT BOTTOM NAV ----------------
+
+  Widget _buildGradientBottomNav() {
+    final items = [
+      Icons.home_outlined,
+      Icons.calendar_today_outlined,
+      Icons.build_outlined,
+      Icons.inventory_2_outlined,
+      Icons.shopping_cart_outlined,
+    ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 15, 12, 25),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.gradientStart, AppColors.gradientEnd],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List.generate(items.length, (index) {
+          final isSelected = _selectedIndex == index;
+
+          return GestureDetector(
+            onTap: () => setState(() => _selectedIndex = index),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.85),
+                  width: 1.4,
+                ),
+              ),
+              child: Icon(
+                items[index],
+                color: isSelected ? AppColors.primary : Colors.white,
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // ---------------- SIGN OUT ----------------
+
+  Future<void> _handleSignOut() async {
+    setState(() => _isSigningOut = true);
+
+    try {
+      await _authService.signOut();
+
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginFormPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Sign out failed: $e")));
+      }
+    } finally {
+      if (mounted) setState(() => _isSigningOut = false);
+    }
+  }
+}
+
+class _SimplePage extends StatelessWidget {
+  final String title;
+  const _SimplePage({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return SafeArea(
+      child: Center(
+        child: Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: onSurface,
+          ),
+        ),
+      ),
+    );
+  }
 }

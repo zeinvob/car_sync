@@ -8,6 +8,8 @@ import 'package:car_sync/core/widgets/gradient_button.dart';
 import 'package:car_sync/features/auth/pages/verify_email_page.dart';
 import 'package:car_sync/features/auth/pages/complete_profile_page.dart';
 import 'package:car_sync/core/services/auth_service.dart';
+import 'package:car_sync/features/admin/presentation/pages/admin_home_scr.dart';
+import 'package:car_sync/main.dart';
 
 class LoginFormPage extends StatefulWidget {
   const LoginFormPage({super.key});
@@ -18,8 +20,9 @@ class LoginFormPage extends StatefulWidget {
 
 class _LoginFormPageState extends State<LoginFormPage> {
   final AuthService _authService = AuthService(
-    clientId: '925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com',
-  ); // client ID 
+    clientId:
+        '925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com',
+  ); // client ID
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _resetEmailController = TextEditingController(); // For forgot password
@@ -378,7 +381,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
           // Navigate to Admin Home Screen
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
           );
         } else if (userRole == 'technician') {
           // Navigate to Technician Home Screen
@@ -476,7 +479,9 @@ class _LoginFormPageState extends State<LoginFormPage> {
           // Profile complete - navigate to home
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            MaterialPageRoute(
+              builder: (context) => const RoleBasedHomeLoader(),
+            ),
           );
         }
       } else {

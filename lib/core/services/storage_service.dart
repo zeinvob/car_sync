@@ -20,27 +20,41 @@ class StorageService {
   }
 
   // Save Google user data (minimal data - no phone/dob)
-  Future<void> saveGoogleUserData({
-    required String uid,
-    required String email,
-    required String fullName,
-  }) async {
-    try {
-      await _usersCollection.doc(uid).set({
+Future<void> saveGoogleUserData({
+  required String uid,
+  required String email,
+  required String fullName,
+}) async {
+  try {
+    final docRef = _usersCollection.doc(uid);
+    final doc = await docRef.get();
+
+    if (!doc.exists) {
+      await docRef.set({
         'uid': uid,
         'email': email,
         'fullName': fullName,
-        'role': 'customer', // Default role
-        'emailVerified': true, // Google emails are verified
+        'role': 'customer',
+        'emailVerified': true,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      print("Google user data saved for UID: $uid");
-    } catch (e) {
-      print("Error saving Google user data: $e");
-      throw e;
+    } else {
+      await docRef.set({
+        'uid': uid,
+        'email': email,
+        'fullName': fullName,
+        'emailVerified': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     }
+
+    print("Google user data saved/updated for UID: $uid");
+  } catch (e) {
+    print("Error saving Google user data: $e");
+    rethrow;
   }
+}
 
   // Check if Google user has complete profile (has phone and dateOfBirth)
   Future<bool> needsProfileCompletion(String uid) async {
@@ -468,4 +482,155 @@ class StorageService {
       print("updateSparePartStock error: $e");
     }
   }
+
+  Future<List<Map<String, dynamic>>> getRecentSpareParts() async {
+    try {
+      final snapshot = await _firestore
+          .collection('spareparts')
+          .limit(10)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'part': data['part'] ?? '',
+          'car_model': data['car_model'] ?? '',
+          'description': data['description'] ?? '',
+          'price': data['price'] ?? 0,
+          'stock': data['stock'] ?? 0,
+          'type': data['type'] ?? '',
+        };
+      }).toList();
+    } catch (e) {
+      print('getRecentSpareParts error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getWorkshopList() async {
+    try {
+      final workshopSnapshot = await _firestore.collection('workshops').get();
+      final bookingSnapshot = await _firestore.collection('bookings').get();
+
+      final bookings = bookingSnapshot.docs.map((doc) => doc.data()).toList();
+
+      return workshopSnapshot.docs.map((doc) {
+        final data = doc.data();
+        final workshopId = doc.id;
+
+        final activeBookingCount = bookings.where((booking) {
+          final sameWorkshop = booking['workshopId'] == workshopId;
+          final status = (booking['status'] ?? '').toString().toLowerCase();
+
+          return sameWorkshop && status != 'completed' && status != 'cancelled';
+        }).length;
+
+        final completedBookingCount = bookings.where((booking) {
+          final sameWorkshop = booking['workshopId'] == workshopId;
+          final status = (booking['status'] ?? '').toString().toLowerCase();
+
+          return sameWorkshop && status == 'completed';
+        }).length;
+
+        return {
+          'id': workshopId,
+          'name': data['name'] ?? 'Workshop',
+          'address': data['address'] ?? 'No address',
+          'rating': data['rating'] ?? 0,
+          'isActive': data['isActive'] ?? false,
+          'bookingCount': activeBookingCount,
+          'completedCount': completedBookingCount,
+        };
+      }).toList();
+    } catch (e) {
+      print('getWorkshopList error: $e');
+      return [];
+    }
+  }
+
+  Future<void> updateBookingStatus({
+    required String bookingId,
+    required String newStatus,
+  }) async {
+    try {
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'status': newStatus,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('updateBookingStatus error: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getBookingsByWorkshop(String workshopId) async {
+  try {
+    final snapshot = await _firestore
+        .collection('bookings')
+        .where('workshopId', isEqualTo: workshopId)
+        .get();
+
+    final List<Map<String, dynamic>> bookingsWithCustomer = [];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+
+      final customerId = (data['customerId'] ?? '').toString();
+      Map<String, dynamic> customerData = {};
+
+      if (customerId.isNotEmpty) {
+        try {
+          final userDoc = await _firestore.collection('users').doc(customerId).get();
+          if (userDoc.exists) {
+            customerData = userDoc.data() ?? {};
+          }
+        } catch (e) {
+          print('Error loading user for booking ${doc.id}: $e');
+        }
+      }
+
+      bookingsWithCustomer.add({
+        'id': doc.id,
+        'customerId': customerId,
+        'customerName': customerData['name'] ??
+            customerData['fullName'] ??
+            customerData['username'] ??
+            'Unknown Customer',
+        'customerPhone': customerData['phone'] ??
+            customerData['contact'] ??
+            customerData['phoneNumber'] ??
+            'No contact',
+        'customerEmail': customerData['email'] ?? 'No email',
+        'serviceType': data['serviceType'] ?? '',
+        'status': data['status'] ?? '',
+        'workshopId': data['workshopId'] ?? '',
+        'slotTime': data['slotTime'],
+        'createdAt': data['createdAt'],
+        'updatedAt': data['updatedAt'],
+      });
+    }
+
+    // Hide completed / cancelled if you want only active bookings
+    final filtered = bookingsWithCustomer.where((booking) {
+      final status = (booking['status'] ?? '').toString().toLowerCase();
+      return status != 'completed' && status != 'cancelled';
+    }).toList();
+
+    // Sort by slot time
+    filtered.sort((a, b) {
+      final aTime = a['slotTime'];
+      final bTime = b['slotTime'];
+
+      if (aTime is Timestamp && bTime is Timestamp) {
+        return aTime.toDate().compareTo(bTime.toDate());
+      }
+      return 0;
+    });
+
+    return filtered;
+  } catch (e) {
+    print('getBookingsByWorkshop error: $e');
+    return [];
+  }
+}
 }
