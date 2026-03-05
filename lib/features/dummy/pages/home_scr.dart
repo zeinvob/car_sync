@@ -49,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const LoginFormPage()),
-          (route) => false, // This removes all previous routes
+          (route) => false, 
         );
       }
       print("Signed out successfully");

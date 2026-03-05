@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:car_sync/core/services/storage_service.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/core/services/auth_nav_flag.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -58,6 +59,7 @@ class AuthService {
       final User? user = userCredential.user;
 
       if (user != null) {
+        await AuthNavFlag.setSignedOutRecently(false);
         final bool isNewUser =
             userCredential.additionalUserInfo?.isNewUser ?? false;
 
@@ -170,7 +172,8 @@ class AuthService {
         }
 
         print("Login successful for: ${user?.email}");
-        return user; // Return the user on success
+        await AuthNavFlag.setSignedOutRecently(false);
+        return user;
       }
 
       return null;
@@ -288,17 +291,15 @@ class AuthService {
   Future<void> signOut() async {
     try {
       if (_auth.currentUser != null) {
-        print("👤 Current user: ${_auth.currentUser?.email}");
+        print("Current user: ${_auth.currentUser?.email}");
 
-        // sign out from Firebase
+        await AuthNavFlag.setSignedOutRecently(true);
+
         await _auth.signOut();
-
-        // sign out from Google
         await _googleSignIn.signOut();
 
         print("Sign out successful");
 
-        // verify sign out was successful
         assert(_auth.currentUser == null, "User should be null after sign out");
       } else {
         print("No user was logged in");

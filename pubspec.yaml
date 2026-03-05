@@ -43,6 +43,7 @@ dependencies:
   chewie: ^1.13.0
   image_picker: ^1.2.1
   firebase_ui_auth: ^3.0.1
+  shared_preferences: 2.2.3
 
 dev_dependencies:
   flutter_test:
