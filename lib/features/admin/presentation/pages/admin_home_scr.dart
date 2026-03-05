@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/core/theme/theme_controller.dart';
+import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -20,6 +22,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final AuthService _authService = AuthService();
   bool _isSigningOut = false;
   int _selectedIndex = 0;
+
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -41,10 +45,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       const _SimplePage(title: "Bookings Page"),
       const _SimplePage(title: "Services Page"),
       const _SimplePage(title: "Stock Page"),
+      const _SimplePage(title: "Parts Order Page"),
       const _SimplePage(title: "Profile Page"),
     ];
 
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: _buildAdminDrawer(),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
@@ -113,22 +120,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            onPressed: () {},
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             icon: const Icon(Icons.menu, color: Colors.white, size: 30),
           ),
-          Row(
-            children: [
-              const Icon(Icons.directions_car, color: Colors.white, size: 28),
-              const SizedBox(width: 8),
-              Text(
-                "CS",
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                ),
+          Expanded(
+            child: Center(
+              child: Image.asset(
+                'assets/logo/white_carsync.png',
+                height: 43,
+                fit: BoxFit.contain,
               ),
-            ],
+            ),
           ),
           Container(
             decoration: BoxDecoration(
@@ -140,12 +142,82 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ),
             child: IconButton(
-              onPressed: _isSigningOut ? null : _handleSignOut,
-              icon: const Icon(Icons.logout, color: Colors.white, size: 22),
-              tooltip: 'Sign Out',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminProfilePage()),
+                );
+              },
+              icon: const Icon(
+                Icons.person_outline,
+                color: Colors.white,
+                size: 22,
+              ),
+              tooltip: 'Profile',
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAdminDrawer() {
+    return Drawer(
+      child: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              child: Text(
+                "Admin Menu",
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: ThemeController.themeMode,
+              builder: (context, mode, _) {
+                final isDark = mode == ThemeMode.dark;
+
+                return SwitchListTile(
+                  title: Text(
+                    "Dark mode",
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  value: isDark,
+                  onChanged: (val) {
+                    ThemeController.toggleTheme();
+                  },
+                );
+              },
+            ),
+
+            const Divider(height: 1),
+
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: Text(
+                "Sign out",
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _handleSignOut();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
