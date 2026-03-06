@@ -87,4 +87,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'carsync-mi.firebasestorage.app',
     measurementId: 'G-7X25NEY197',
   );
+
 }
