@@ -642,6 +642,24 @@ class StorageService {
     }
   }
 
+  /// all booking notifications for a workshop
+  Stream<int> getActiveBookingsCountStream() {
+    return _firestore.collection('bookings').snapshots().map((snapshot) {
+      int count = 0;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final status = (data['status'] ?? '').toString().toLowerCase();
+
+        if (status != 'completed' && status != 'cancelled') {
+          count++;
+        }
+      }
+
+      return count;
+    });
+  }
+
   ///--------------------------- Notification Functions ---------------------------
   CollectionReference get _notificationsCollection =>
       _firestore.collection('notifications');

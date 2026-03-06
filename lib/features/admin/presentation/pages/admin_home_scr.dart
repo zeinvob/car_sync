@@ -12,7 +12,6 @@ import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.da
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -24,6 +23,8 @@ class AdminHomeScreen extends StatefulWidget {
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final NotificationService _notificationService = NotificationService.instance;
+  int _activeBookingsCount = 0;
+  StreamSubscription<int>? _activeBookingsSubscription;
   int _unreadNotificationCount = 0;
   int _unreadBookingCount = 0;
   StreamSubscription<int>? _notificationCountSubscription;
@@ -38,10 +39,26 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  void _listenToActiveBookingsCount() {
+    _activeBookingsSubscription?.cancel();
+
+    _activeBookingsSubscription = _storageService
+        .getActiveBookingsCountStream()
+        .listen((count) {
+          if (mounted) {
+            setState(() {
+              _activeBookingsCount = count;
+            });
+          }
+        });
+  }
+
   @override
   void initState() {
     super.initState();
     _listenToNotificationCounts();
+    _listenToActiveBookingsCount();
+
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -57,6 +74,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   void dispose() {
     _notificationCountSubscription?.cancel();
     _bookingCountSubscription?.cancel();
+    _activeBookingsSubscription?.cancel();
     super.dispose();
   }
 
@@ -498,16 +516,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: _buildActionCard(
-                  icon: Icons.calendar_month_outlined,
-                  label: 'Bookings',
-                  color: AppColors.primary,
-                  onTap: () {
-                    setState(() => _selectedIndex = 1);
-                  },
-                ),
-              ),
+              Expanded(child: _buildBookingsActionCard()),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildActionCard(
@@ -551,6 +560,102 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
     );
   }
+
+Widget _buildBookingsActionCard() {
+  final cardColor = Theme.of(context).cardColor;
+  final onSurface = Theme.of(context).colorScheme.onSurface;
+
+  return GestureDetector(
+    onTap: () {
+      setState(() => _selectedIndex = 1);
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Align(
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_month_outlined,
+                    color: AppColors.primary,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Bookings',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_activeBookingsCount > 0)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.22),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  _activeBookingsCount > 99
+                      ? '99+'
+                      : '$_activeBookingsCount',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildActionCard({
     required IconData icon,
@@ -1002,7 +1107,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           color: isSelected ? AppColors.primary : Colors.white,
                           size: 22,
                         ),
-                        if (index == 1 && _unreadBookingCount > 0)
+                        if (index == 1 && _activeBookingsCount > 0)
                           Positioned(
                             right: -8,
                             top: -6,
@@ -1020,9 +1125,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 minHeight: 16,
                               ),
                               child: Text(
-                                _unreadBookingCount > 99
+                                _activeBookingsCount > 99
                                     ? '99+'
-                                    : '$_unreadBookingCount',
+                                    : '$_activeBookingsCount',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
