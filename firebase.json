@@ -1,25 +1,42 @@
 {
-    "flutter": {
-        "platforms": {
-            "android": {
-                "default": {
-                    "projectId": "carsync-mi",
-                    "appId": "1:925167052954:android:66201f31ea7d5c06905723",
-                    "fileOutput": "android/app/google-services.json"
-                }
-            },
-            "dart": {
-                "lib/firebase_options.dart": {
-                    "projectId": "carsync-mi",
-                    "configurations": {
-                        "android": "1:925167052954:android:66201f31ea7d5c06905723",
-                        "ios": "1:925167052954:ios:120422eab0bd7096905723",
-                        "macos": "1:925167052954:ios:120422eab0bd7096905723",
-                        "web": "1:925167052954:web:698b7df10378b582905723",
-                        "windows": "1:925167052954:web:7ed74e1ad1189d8e905723"
-                    }
-                }
-            }
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "carsync-mi",
+          "appId": "1:925167052954:android:66201f31ea7d5c06905723",
+          "fileOutput": "android/app/google-services.json"
         }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "carsync-mi",
+          "configurations": {
+            "android": "1:925167052954:android:66201f31ea7d5c06905723",
+            "ios": "1:925167052954:ios:120422eab0bd7096905723",
+            "macos": "1:925167052954:ios:120422eab0bd7096905723",
+            "web": "1:925167052954:web:698b7df10378b582905723",
+            "windows": "1:925167052954:web:7ed74e1ad1189d8e905723"
+          }
+        }
+      }
     }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ]
+    }
+  ]
 }

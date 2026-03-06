@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 class StorageService {
@@ -20,41 +21,41 @@ class StorageService {
   }
 
   // Save Google user data (minimal data - no phone/dob)
-Future<void> saveGoogleUserData({
-  required String uid,
-  required String email,
-  required String fullName,
-}) async {
-  try {
-    final docRef = _usersCollection.doc(uid);
-    final doc = await docRef.get();
+  Future<void> saveGoogleUserData({
+    required String uid,
+    required String email,
+    required String fullName,
+  }) async {
+    try {
+      final docRef = _usersCollection.doc(uid);
+      final doc = await docRef.get();
 
-    if (!doc.exists) {
-      await docRef.set({
-        'uid': uid,
-        'email': email,
-        'fullName': fullName,
-        'role': 'customer',
-        'emailVerified': true,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } else {
-      await docRef.set({
-        'uid': uid,
-        'email': email,
-        'fullName': fullName,
-        'emailVerified': true,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      if (!doc.exists) {
+        await docRef.set({
+          'uid': uid,
+          'email': email,
+          'fullName': fullName,
+          'role': 'customer',
+          'emailVerified': true,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await docRef.set({
+          'uid': uid,
+          'email': email,
+          'fullName': fullName,
+          'emailVerified': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      print("Google user data saved/updated for UID: $uid");
+    } catch (e) {
+      print("Error saving Google user data: $e");
+      rethrow;
     }
-
-    print("Google user data saved/updated for UID: $uid");
-  } catch (e) {
-    print("Error saving Google user data: $e");
-    rethrow;
   }
-}
 
   // Check if Google user has complete profile (has phone and dateOfBirth)
   Future<bool> needsProfileCompletion(String uid) async {
@@ -563,74 +564,264 @@ Future<void> saveGoogleUserData({
     }
   }
 
-  Future<List<Map<String, dynamic>>> getBookingsByWorkshop(String workshopId) async {
-  try {
-    final snapshot = await _firestore
-        .collection('bookings')
-        .where('workshopId', isEqualTo: workshopId)
-        .get();
+  Future<List<Map<String, dynamic>>> getBookingsByWorkshop(
+    String workshopId,
+  ) async {
+    try {
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('workshopId', isEqualTo: workshopId)
+          .get();
 
-    final List<Map<String, dynamic>> bookingsWithCustomer = [];
+      final List<Map<String, dynamic>> bookingsWithCustomer = [];
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
 
-      final customerId = (data['customerId'] ?? '').toString();
-      Map<String, dynamic> customerData = {};
+        final customerId = (data['customerId'] ?? '').toString();
+        Map<String, dynamic> customerData = {};
 
-      if (customerId.isNotEmpty) {
-        try {
-          final userDoc = await _firestore.collection('users').doc(customerId).get();
-          if (userDoc.exists) {
-            customerData = userDoc.data() ?? {};
+        if (customerId.isNotEmpty) {
+          try {
+            final userDoc = await _firestore
+                .collection('users')
+                .doc(customerId)
+                .get();
+            if (userDoc.exists) {
+              customerData = userDoc.data() ?? {};
+            }
+          } catch (e) {
+            print('Error loading user for booking ${doc.id}: $e');
           }
-        } catch (e) {
-          print('Error loading user for booking ${doc.id}: $e');
         }
+
+        bookingsWithCustomer.add({
+          'id': doc.id,
+          'customerId': customerId,
+          'customerName':
+              customerData['name'] ??
+              customerData['fullName'] ??
+              customerData['username'] ??
+              'Unknown Customer',
+          'customerPhone':
+              customerData['phone'] ??
+              customerData['contact'] ??
+              customerData['phoneNumber'] ??
+              'No contact',
+          'customerEmail': customerData['email'] ?? 'No email',
+          'serviceType': data['serviceType'] ?? '',
+          'status': data['status'] ?? '',
+          'workshopId': data['workshopId'] ?? '',
+          'slotTime': data['slotTime'],
+          'createdAt': data['createdAt'],
+          'updatedAt': data['updatedAt'],
+        });
       }
 
-      bookingsWithCustomer.add({
-        'id': doc.id,
-        'customerId': customerId,
-        'customerName': customerData['name'] ??
-            customerData['fullName'] ??
-            customerData['username'] ??
-            'Unknown Customer',
-        'customerPhone': customerData['phone'] ??
-            customerData['contact'] ??
-            customerData['phoneNumber'] ??
-            'No contact',
-        'customerEmail': customerData['email'] ?? 'No email',
-        'serviceType': data['serviceType'] ?? '',
-        'status': data['status'] ?? '',
-        'workshopId': data['workshopId'] ?? '',
-        'slotTime': data['slotTime'],
-        'createdAt': data['createdAt'],
-        'updatedAt': data['updatedAt'],
+      // Hide completed / cancelled if you want only active bookings
+      final filtered = bookingsWithCustomer.where((booking) {
+        final status = (booking['status'] ?? '').toString().toLowerCase();
+        return status != 'completed' && status != 'cancelled';
+      }).toList();
+
+      // Sort by slot time
+      filtered.sort((a, b) {
+        final aTime = a['slotTime'];
+        final bTime = b['slotTime'];
+
+        if (aTime is Timestamp && bTime is Timestamp) {
+          return aTime.toDate().compareTo(bTime.toDate());
+        }
+        return 0;
       });
+
+      return filtered;
+    } catch (e) {
+      print('getBookingsByWorkshop error: $e');
+      return [];
     }
-
-    // Hide completed / cancelled if you want only active bookings
-    final filtered = bookingsWithCustomer.where((booking) {
-      final status = (booking['status'] ?? '').toString().toLowerCase();
-      return status != 'completed' && status != 'cancelled';
-    }).toList();
-
-    // Sort by slot time
-    filtered.sort((a, b) {
-      final aTime = a['slotTime'];
-      final bTime = b['slotTime'];
-
-      if (aTime is Timestamp && bTime is Timestamp) {
-        return aTime.toDate().compareTo(bTime.toDate());
-      }
-      return 0;
-    });
-
-    return filtered;
-  } catch (e) {
-    print('getBookingsByWorkshop error: $e');
-    return [];
   }
-}
+
+  ///--------------------------- Notification Functions ---------------------------
+  CollectionReference get _notificationsCollection =>
+      _firestore.collection('notifications');
+
+  Future<void> saveUserDeviceToken({
+    required String uid,
+    required String role,
+    required String token,
+  }) async {
+    try {
+      await _usersCollection.doc(uid).set({
+        'fcmToken': token,
+        'role': role,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error saving user device token: $e');
+    }
+  }
+
+  Future<void> createNotification({
+    required String targetRole,
+    required String type,
+    required String title,
+    required String body,
+    String? relatedBookingId,
+    String? relatedWorkshopId,
+    Map<String, dynamic>? extraData,
+  }) async {
+    try {
+      await _notificationsCollection.add({
+        'targetRole': targetRole,
+        'type': type,
+        'title': title,
+        'body': body,
+        'relatedBookingId': relatedBookingId,
+        'relatedWorkshopId': relatedWorkshopId,
+        'extraData': extraData ?? {},
+        'isReadBy': [],
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error creating notification: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> createNewBookingNotificationForAdmins({
+    required String bookingId,
+    required String workshopId,
+    required String workshopName,
+    required String customerName,
+  }) async {
+    await createNotification(
+      targetRole: 'admin',
+      type: 'new_booking',
+      title: 'New Booking',
+      body: '$customerName placed a new booking for $workshopName',
+      relatedBookingId: bookingId,
+      relatedWorkshopId: workshopId,
+      extraData: {
+        'bookingId': bookingId,
+        'workshopId': workshopId,
+        'workshopName': workshopName,
+        'customerName': customerName,
+      },
+    );
+  }
+
+  Future<void> createNewBookingNotificationForWorkshops({
+    required String bookingId,
+    required String workshopId,
+    required String customerName,
+  }) async {
+    await createNotification(
+      targetRole: 'workshop',
+      type: 'new_booking',
+      title: 'New Booking',
+      body: '$customerName placed a new booking',
+      relatedBookingId: bookingId,
+      relatedWorkshopId: workshopId,
+      extraData: {'bookingId': bookingId, 'workshopId': workshopId},
+    );
+  }
+
+  Stream<List<Map<String, dynamic>>> getNotificationsByRoleStream(String role) {
+    return _notificationsCollection
+        .where('targetRole', isEqualTo: role)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return {'id': doc.id, ...data};
+          }).toList();
+        });
+  }
+
+  Stream<int> getUnreadNotificationCountByRole({
+    required String role,
+    required String currentUserId,
+  }) {
+    return _notificationsCollection
+        .where('targetRole', isEqualTo: role)
+        .snapshots()
+        .map((snapshot) {
+          int count = 0;
+
+          for (final doc in snapshot.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final List<dynamic> isReadBy = data['isReadBy'] ?? [];
+
+            if (!isReadBy.contains(currentUserId)) {
+              count++;
+            }
+          }
+
+          return count;
+        });
+  }
+
+  Stream<int> getUnreadBookingNotificationCountByRole({
+    required String role,
+    required String currentUserId,
+  }) {
+    return _notificationsCollection
+        .where('targetRole', isEqualTo: role)
+        .where('type', isEqualTo: 'new_booking')
+        .snapshots()
+        .map((snapshot) {
+          int count = 0;
+
+          for (final doc in snapshot.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final List<dynamic> isReadBy = data['isReadBy'] ?? [];
+
+            if (!isReadBy.contains(currentUserId)) {
+              count++;
+            }
+          }
+
+          return count;
+        });
+  }
+
+  Future<void> markNotificationAsReadForUser({
+    required String notificationId,
+    required String userId,
+  }) async {
+    try {
+      await _notificationsCollection.doc(notificationId).update({
+        'isReadBy': FieldValue.arrayUnion([userId]),
+      });
+    } catch (e) {
+      debugPrint('Error marking notification as read for user: $e');
+    }
+  }
+
+  Future<void> markAllRoleNotificationsAsReadForUser({
+    required String role,
+    required String userId,
+  }) async {
+    try {
+      final snapshot = await _notificationsCollection
+          .where('targetRole', isEqualTo: role)
+          .get();
+
+      final batch = _firestore.batch();
+
+      for (final doc in snapshot.docs) {
+        batch.update(doc.reference, {
+          'isReadBy': FieldValue.arrayUnion([userId]),
+        });
+      }
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Error marking role notifications as read: $e');
+    }
+  }
+
+  //-------------------------------  notification functions -------------------------------
 }
