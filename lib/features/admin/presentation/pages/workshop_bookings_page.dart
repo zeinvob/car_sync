@@ -9,11 +9,13 @@ import 'package:car_sync/core/widgets/gradient_button.dart';
 class WorkshopBookingsPage extends StatefulWidget {
   final String workshopId;
   final String workshopName;
+  final String? highlightBookingId;
 
   const WorkshopBookingsPage({
     super.key,
     required this.workshopId,
     required this.workshopName,
+    this.highlightBookingId,
   });
 
   @override
@@ -24,8 +26,8 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
   final StorageService _storageService = StorageService();
 
   final TextEditingController _searchController = TextEditingController();
-  String _filter = 'All'; // All | Active | Completed
-  bool _showPast = true; // show past bookings toggle
+  String _filter = 'All';
+  bool _showPast = true;
 
   @override
   void dispose() {
@@ -33,21 +35,26 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     super.dispose();
   }
 
-  // -------- status color mapping --------
-
   Color _statusColor(String status) {
     final s = status.toLowerCase();
     if (s == 'requested') return Colors.red;
     if (s == 'confirmed') return Colors.orange;
     if (s == 'in_progress') return Colors.blue;
     if (s == 'completed') return Colors.green;
+    if (s == 'pending') return Colors.red;
     return Colors.grey;
-    // you can add "cancelled" etc here too
   }
 
   String _formatTimestamp(dynamic value) {
     if (value is Timestamp) {
       return DateFormat('dd MMM yyyy, hh:mm a').format(value.toDate());
+    }
+    return '-';
+  }
+
+  String _formatTimeOnly(dynamic value) {
+    if (value is Timestamp) {
+      return DateFormat('hh:mm a').format(value.toDate());
     }
     return '-';
   }
@@ -94,7 +101,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
             ElevatedButton(
               onPressed: () => Navigator.pop(context, selected),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: const Color.fromARGB(255, 126, 191, 255),
               ),
               child: Text(
                 'Save',
@@ -115,14 +122,11 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     }
   }
 
-  // -------- search + filter + sort --------
-
   List<Map<String, dynamic>> _applySearchFilterSort(
     List<Map<String, dynamic>> bookings,
   ) {
     final query = _searchController.text.trim().toLowerCase();
 
-    // 1) search
     var result = bookings.where((b) {
       if (query.isEmpty) return true;
 
@@ -137,7 +141,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
           service.contains(query);
     }).toList();
 
-    // 2) filter
     if (_filter == 'Active') {
       result = result.where((b) {
         final s = (b['status'] ?? '').toString().toLowerCase();
@@ -150,7 +153,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
       }).toList();
     }
 
-    // 3) optionally hide past bookings
     if (!_showPast) {
       final now = DateTime.now();
       result = result.where((b) {
@@ -160,8 +162,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
       }).toList();
     }
 
-    // 4) sort by slotTime:
-    //    upcoming first; past goes down.
     final now = DateTime.now();
     result.sort((a, b) {
       final aDt = _timestampToDate(a['slotTime']) ?? DateTime(1970);
@@ -170,15 +170,22 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
       final aIsPast = aDt.isBefore(now);
       final bIsPast = bDt.isBefore(now);
 
-      // upcoming before past
       if (aIsPast != bIsPast) return aIsPast ? 1 : -1;
-
-      // both upcoming: earliest first
       if (!aIsPast && !bIsPast) return aDt.compareTo(bDt);
-
-      // both past: newest past first (recent past on top of past section)
       return bDt.compareTo(aDt);
     });
+
+    if (widget.highlightBookingId != null &&
+        widget.highlightBookingId!.isNotEmpty) {
+      result.sort((a, b) {
+        final aMatch = a['id'] == widget.highlightBookingId;
+        final bMatch = b['id'] == widget.highlightBookingId;
+
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+        return 0;
+      });
+    }
 
     return result;
   }
@@ -191,8 +198,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
 
     return Scaffold(
       backgroundColor: bg,
-
-      // Gradient AppBar
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(62),
         child: Container(
@@ -229,15 +234,12 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
           ),
         ),
       ),
-
       body: Column(
         children: [
-          // -------- SEARCH + FILTER BAR --------
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Column(
               children: [
-                // Search
                 TextField(
                   controller: _searchController,
                   onChanged: (_) => setState(() {}),
@@ -264,8 +266,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-
-                // Filter row
                 Row(
                   children: [
                     _filterChip("All"),
@@ -295,8 +295,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
               ],
             ),
           ),
-
-          // -------- BOOKINGS LIST --------
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: _storageService.getBookingsByWorkshop(widget.workshopId),
@@ -327,12 +325,20 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                     final booking = bookings[index];
                     final status = (booking['status'] ?? '').toString();
                     final statusColor = _statusColor(status);
+                    final isHighlighted =
+                        booking['id'] == widget.highlightBookingId;
 
-                    return Container(
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
-                        color: cardColor,
+                        color: isHighlighted
+                            ? const Color.fromARGB(255, 42, 170, 255).withOpacity(0.056)
+                            : cardColor,
                         borderRadius: BorderRadius.circular(14),
+                        border: isHighlighted
+                            ? Border.all(color: AppColors.primary, width: 1.5)
+                            : null,
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.06),
@@ -344,7 +350,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Gradient strip
                           Container(
                             height: 8,
                             decoration: const BoxDecoration(
@@ -361,22 +366,76 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                               ),
                             ),
                           ),
-
                           Padding(
                             padding: const EdgeInsets.all(14),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  booking['serviceType'] ?? 'Service',
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 18,
-                                    color: onSurface,
-                                  ),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        booking['serviceType'] ?? 'Service',
+                                        style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 18,
+                                          color: onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          "Booked On",
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: onSurface.withOpacity(0.55),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _formatTimestamp(
+                                            booking['createdAt'],
+                                          ),
+                                          textAlign: TextAlign.right,
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 11,
+                                            color: onSurface.withOpacity(0.75),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 8),
-
+                                if (isHighlighted) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(
+                                        0.12,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'Selected from notification',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                ],
                                 Text(
                                   "Customer: ${booking['customerName'] ?? 'Unknown'}",
                                   style: GoogleFonts.poppins(
@@ -386,7 +445,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-
                                 Text(
                                   "Contact: ${booking['customerPhone'] ?? '-'}",
                                   style: GoogleFonts.poppins(
@@ -395,7 +453,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-
                                 Text(
                                   "Email: ${booking['customerEmail'] ?? '-'}",
                                   style: GoogleFonts.poppins(
@@ -404,17 +461,38 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-
                                 Text(
-                                  "Slot Time: ${_formatTimestamp(booking['slotTime'])}",
+                                  "Vehicle ID: ${(booking['vehicleId'] ?? '').toString().isEmpty ? '-' : booking['vehicleId']}",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: onSurface.withOpacity(0.75),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Notes: ${(booking['notes'] ?? '').toString().trim().isEmpty ? 'No notes' : booking['notes']}",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: onSurface.withOpacity(0.75),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Booked Slot: ${_formatTimestamp(booking['slotTime'])}",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: onSurface.withOpacity(0.75),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Booked Time Only: ${_formatTimeOnly(booking['slotTime'])}",
                                   style: GoogleFonts.poppins(
                                     fontSize: 12,
                                     color: onSurface.withOpacity(0.75),
                                   ),
                                 ),
                                 const SizedBox(height: 10),
-
-                                // ✅ Status badge with changing color
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
@@ -436,10 +514,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                                     ),
                                   ),
                                 ),
-
                                 const SizedBox(height: 14),
-
-                                // ✅ Update (outlined) + Chat (gradient)
                                 Row(
                                   children: [
                                     Expanded(
@@ -453,7 +528,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                                         },
                                         style: OutlinedButton.styleFrom(
                                           side: const BorderSide(
-                                            color: AppColors.primary,
+                                            color: Color.fromARGB(255, 47, 111, 60),
                                             width: 1.6,
                                           ),
                                           shape: RoundedRectangleBorder(
@@ -512,7 +587,6 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     );
   }
 
-  // -------- Filter Chip UI --------
   Widget _filterChip(String label) {
     final selected = _filter == label;
 

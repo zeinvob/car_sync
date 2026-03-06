@@ -10,6 +10,10 @@ import 'package:car_sync/features/auth/pages/login_form_page.dart';
 import 'package:car_sync/core/theme/theme_controller.dart';
 import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:car_sync/core/services/notification_service.dart';
+import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -19,6 +23,11 @@ class AdminHomeScreen extends StatefulWidget {
 }
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
+  final NotificationService _notificationService = NotificationService.instance;
+  int _unreadNotificationCount = 0;
+  int _unreadBookingCount = 0;
+  StreamSubscription<int>? _notificationCountSubscription;
+  StreamSubscription<int>? _bookingCountSubscription;
   final StorageService _storageService = StorageService();
   final AuthService _authService = AuthService();
   bool _isSigningOut = false;
@@ -32,7 +41,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   void initState() {
     super.initState();
-
+    _listenToNotificationCounts();
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -42,6 +51,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
 
     _loadAdminData();
+  }
+
+  @override
+  void dispose() {
+    _notificationCountSubscription?.cancel();
+    _bookingCountSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadAdminData() async {
@@ -164,10 +180,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Drawer menu button
           IconButton(
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             icon: const Icon(Icons.menu, color: Colors.white, size: 30),
           ),
+
+          // App logo in the center
           Expanded(
             child: Center(
               child: Image.asset(
@@ -177,6 +196,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ),
           ),
+
+          // Notification button on the right
           Container(
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
@@ -186,19 +207,56 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 width: 1,
               ),
             ),
-            child: IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AdminProfilePage()),
-                );
-              },
-              icon: const Icon(
-                Icons.person_outline,
-                color: Colors.white,
-                size: 22,
-              ),
-              tooltip: 'Profile',
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsPage(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                  tooltip: 'Notifications',
+                ),
+                if (_unreadNotificationCount > 0)
+                  Positioned(
+                    right: 4,
+                    top: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        _unreadNotificationCount > 99
+                            ? '99+'
+                            : '$_unreadNotificationCount',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -212,6 +270,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
+            // Drawer title
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
               child: Text(
@@ -222,7 +281,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
             ),
+
             const Divider(height: 1),
+
+            // Profile section
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: Text(
+                "Profile",
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: _adminEmail.isNotEmpty
+                  ? Text(
+                      _adminEmail,
+                      style: GoogleFonts.poppins(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  : null,
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminProfilePage()),
+                );
+              },
+            ),
+
+            const Divider(height: 1),
+
+            // Theme switch
             ValueListenableBuilder<ThemeMode>(
               valueListenable: ThemeController.themeMode,
               builder: (context, mode, _) {
@@ -243,7 +333,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 );
               },
             ),
+
             const Divider(height: 1),
+
+            // Sign out option
             ListTile(
               leading: const Icon(Icons.logout),
               title: Text(
@@ -899,12 +992,47 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      isSelected
-                          ? items[index]['activeIcon'] as IconData
-                          : items[index]['icon'] as IconData,
-                      color: isSelected ? AppColors.primary : Colors.white,
-                      size: 22,
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          isSelected
+                              ? items[index]['activeIcon'] as IconData
+                              : items[index]['icon'] as IconData,
+                          color: isSelected ? AppColors.primary : Colors.white,
+                          size: 22,
+                        ),
+                        if (index == 1 && _unreadBookingCount > 0)
+                          Positioned(
+                            right: -8,
+                            top: -6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                _unreadBookingCount > 99
+                                    ? '99+'
+                                    : '$_unreadBookingCount',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -952,6 +1080,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       if (mounted) setState(() => _isSigningOut = false);
     }
   }
+
+  // Notification handling
+  void _listenToNotificationCounts() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _notificationCountSubscription?.cancel();
+    _bookingCountSubscription?.cancel();
+
+    _notificationCountSubscription = _notificationService
+        .unreadNotificationCountStream(role: 'admin', currentUserId: user.uid)
+        .listen((count) {
+          if (mounted) {
+            setState(() {
+              _unreadNotificationCount = count;
+            });
+          }
+        });
+
+    _bookingCountSubscription = _notificationService
+        .unreadBookingNotificationCountStream(
+          role: 'admin',
+          currentUserId: user.uid,
+        )
+        .listen((count) {
+          if (mounted) {
+            setState(() {
+              _unreadBookingCount = count;
+            });
+          }
+        });
+  }
 }
 
 class _SimplePage extends StatelessWidget {
@@ -961,8 +1121,23 @@ class _SimplePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    return SafeArea(
-      child: Center(
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: onSurface,
+          ),
+        ),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
+        iconTheme: IconThemeData(color: onSurface),
+      ),
+      body: Center(
         child: Text(
           title,
           style: GoogleFonts.poppins(
