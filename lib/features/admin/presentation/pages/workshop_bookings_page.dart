@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 class WorkshopBookingsPage extends StatefulWidget {
   final String workshopId;
@@ -98,14 +99,15 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
               onPressed: () => Navigator.pop(context),
               child: Text('Cancel', style: GoogleFonts.poppins()),
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, selected),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(255, 126, 191, 255),
-              ),
-              child: Text(
-                'Save',
-                style: GoogleFonts.poppins(color: Colors.white),
+            Expanded(
+              child: GradientButton(
+                text: "Save",
+
+                height: 45,
+                borderRadius: 12,
+                onPressed: () {
+                  Navigator.pop(context, selected);
+                },
               ),
             ),
           ],
@@ -328,253 +330,297 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                     final isHighlighted =
                         booking['id'] == widget.highlightBookingId;
 
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: isHighlighted
-                            ? const Color.fromARGB(255, 42, 170, 255).withOpacity(0.056)
-                            : cardColor,
-                        borderRadius: BorderRadius.circular(14),
-                        border: isHighlighted
-                            ? Border.all(color: AppColors.primary, width: 1.5)
-                            : null,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                    return Slidable(
+                      key: ValueKey(booking['id']),
+                      endActionPane: ActionPane(
+                        motion: const DrawerMotion(),
+                        extentRatio: 0.5,
+                        children: [
+                          SlidableAction(
+                            onPressed: (_) {
+                              _changeStatus(
+                                booking['id'],
+                                (booking['status'] ?? 'pending').toString(),
+                              );
+                            },
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            icon: Icons.edit_outlined,
+                            label: 'Update',
+                            borderRadius: const BorderRadius.horizontal(
+                              left: Radius.circular(14),
+                            ),
+                          ),
+                          SlidableAction(
+                            onPressed: (_) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Open chat feature next'),
+                                ),
+                              );
+                            },
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            icon: Icons.chat_bubble_outline,
+                            label: 'Chat',
+                            borderRadius: const BorderRadius.horizontal(
+                              right: Radius.circular(14),
+                            ),
                           ),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppColors.gradientStart,
-                                  AppColors.gradientEnd,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(14),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: isHighlighted
+                              ? AppColors.primary.withOpacity(0.08)
+                              : cardColor,
+                          borderRadius: BorderRadius.circular(14),
+                          border: isHighlighted
+                              ? Border.all(color: AppColors.primary, width: 1.5)
+                              : null,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.gradientStart,
+                                    AppColors.gradientEnd,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(14),
+                                ),
                               ),
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
+                            Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          booking['serviceType'] ?? 'Service',
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 18,
+                                            color: onSurface,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            "Booked On",
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: onSurface.withOpacity(
+                                                0.55,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _formatTimestamp(
+                                              booking['createdAt'],
+                                            ),
+                                            textAlign: TextAlign.right,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 11,
+                                              color: onSurface.withOpacity(
+                                                0.75,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (isHighlighted) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(
+                                          0.12,
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
                                       child: Text(
-                                        booking['serviceType'] ?? 'Service',
+                                        'Selected from notification',
                                         style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 18,
-                                          color: onSurface,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primary,
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          "Booked On",
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                            color: onSurface.withOpacity(0.55),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _formatTimestamp(
-                                            booking['createdAt'],
-                                          ),
-                                          textAlign: TextAlign.right,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 11,
-                                            color: onSurface.withOpacity(0.75),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                    const SizedBox(height: 10),
                                   ],
-                                ),
-                                const SizedBox(height: 8),
-                                if (isHighlighted) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 5,
+                                  Text(
+                                    "Customer: ${booking['customerName'] ?? 'Unknown'}",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: onSurface,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(
-                                        0.12,
-                                      ),
-                                      borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Contact: ${booking['customerPhone'] ?? '-'}",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      color: onSurface.withOpacity(0.75),
                                     ),
-                                    child: Text(
-                                      'Selected from notification',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.primary,
-                                      ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Email: ${booking['customerEmail'] ?? '-'}",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      color: onSurface.withOpacity(0.75),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Vehicle ID: ${(booking['vehicleId'] ?? '').toString().isEmpty ? '-' : booking['vehicleId']}",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      color: onSurface.withOpacity(0.75),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Notes: ${(booking['notes'] ?? '').toString().trim().isEmpty ? 'No notes' : booking['notes']}",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      color: onSurface.withOpacity(0.75),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Booked Slot: ${_formatTimestamp(booking['slotTime'])}",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      color: onSurface.withOpacity(0.75),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Booked Time Only: ${_formatTimeOnly(booking['slotTime'])}",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      color: onSurface.withOpacity(0.75),
                                     ),
                                   ),
                                   const SizedBox(height: 10),
-                                ],
-                                Text(
-                                  "Customer: ${booking['customerName'] ?? 'Unknown'}",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Contact: ${booking['customerPhone'] ?? '-'}",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: onSurface.withOpacity(0.75),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Email: ${booking['customerEmail'] ?? '-'}",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: onSurface.withOpacity(0.75),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Vehicle ID: ${(booking['vehicleId'] ?? '').toString().isEmpty ? '-' : booking['vehicleId']}",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: onSurface.withOpacity(0.75),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Notes: ${(booking['notes'] ?? '').toString().trim().isEmpty ? 'No notes' : booking['notes']}",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: onSurface.withOpacity(0.75),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Booked Slot: ${_formatTimestamp(booking['slotTime'])}",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: onSurface.withOpacity(0.75),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Booked Time Only: ${_formatTimeOnly(booking['slotTime'])}",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: onSurface.withOpacity(0.75),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: statusColor.withOpacity(0.7),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: statusColor.withOpacity(0.7),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      "Status: $status",
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: statusColor,
+                                      ),
                                     ),
                                   ),
-                                  child: Text(
-                                    "Status: $status",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: statusColor,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () {
-                                          _changeStatus(
-                                            booking['id'],
-                                            (booking['status'] ?? 'requested')
-                                                .toString(),
-                                          );
-                                        },
-                                        style: OutlinedButton.styleFrom(
-                                          side: const BorderSide(
-                                            color: Color.fromARGB(255, 47, 111, 60),
-                                            width: 1.6,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () {
+                                            _changeStatus(
+                                              booking['id'],
+                                              (booking['status'] ?? 'pending')
+                                                  .toString(),
+                                            );
+                                          },
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(
+                                              color: AppColors.primary,
+                                              width: 1.6,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
                                             ),
                                           ),
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          "UPDATE",
-                                          style: GoogleFonts.poppins(
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 2,
+                                          child: Text(
+                                            "UPDATE",
+                                            style: GoogleFonts.poppins(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 2,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: GradientButton(
-                                        text: "CHAT",
-                                        height: 45,
-                                        borderRadius: 12,
-                                        onPressed: () {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Open chat feature next',
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: GradientButton(
+                                          text: "CHAT",
+                                          height: 45,
+                                          borderRadius: 12,
+                                          onPressed: () {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Open chat feature next',
+                                                ),
                                               ),
-                                            ),
-                                          );
-                                        },
+                                            );
+                                          },
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   },
