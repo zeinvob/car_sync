@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:car_sync/features/dummy/pages/home_scr.dart';
+import 'package:car_sync/features/customer/pages/home.dart';
 import 'package:car_sync/features/splash/pages/video_splash_scr.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/features/admin/presentation/pages/admin_home_scr.dart';
@@ -14,9 +15,7 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 
@@ -109,9 +108,7 @@ class _MyAppState extends State<MyApp> {
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Scaffold(
-                        body: Center(
-                          child: CircularProgressIndicator(),
-                        ),
+                        body: Center(child: CircularProgressIndicator()),
                       );
                     }
 
@@ -125,9 +122,7 @@ class _MyAppState extends State<MyApp> {
                         if (flagSnap.connectionState ==
                             ConnectionState.waiting) {
                           return const Scaffold(
-                            body: Center(
-                              child: CircularProgressIndicator(),
-                            ),
+                            body: Center(child: CircularProgressIndicator()),
                           );
                         }
 
@@ -160,28 +155,24 @@ class RoleBasedHomeLoader extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasError) {
           return const Scaffold(
-            body: Center(
-              child: Text('Failed to load user role'),
-            ),
+            body: Center(child: Text('Failed to load user role')),
           );
         }
 
         final role = snapshot.data;
-        
+
         if (role == 'admin') {
           return const AdminHomeScreen();
         } else if (role == 'technician' || role == 'foreman') {
           return const HomeScreen();
         } else {
-          return const HomeScreen();
+          return const CustomerHomePage();
         }
       },
     );

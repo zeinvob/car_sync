@@ -160,18 +160,21 @@ class AuthService {
       User? user = result.user;
 
       // Check if email is verified
+      // TODO: Re-enable email verification check for production
+      // if (user != null) {
+      //   // Reload to get latest emailVerified status
+      //   await user.reload();
+      //   user = _auth.currentUser;
+
+      //   if (user != null && !user.emailVerified) {
+      //     print("Email not verified: $email");
+      //     await _auth.signOut();
+      //     throw Exception('email-not-verified');
+      //   }
+      // }
+
       if (user != null) {
-        // Reload to get latest emailVerified status
-        await user.reload();
-        user = _auth.currentUser;
-
-        if (user != null && !user.emailVerified) {
-          print("Email not verified: $email");
-          await _auth.signOut();
-          throw Exception('email-not-verified');
-        }
-
-        print("Login successful for: ${user?.email}");
+        print("Login successful for: ${user.email}");
         await AuthNavFlag.setSignedOutRecently(false);
         return user;
       }
