@@ -29,6 +29,13 @@
             {
               "client_id": "925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "925167052954-pugptg2sg2k3e88bhkq04ht13aeij09p.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.carSync"
+              }
             }
           ]
         }
