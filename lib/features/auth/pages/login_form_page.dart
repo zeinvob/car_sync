@@ -1,12 +1,15 @@
-import 'package:car_sync/features/auth/presentation/pages/signup_page.dart';
+import 'package:car_sync/features/auth/pages/signup_page.dart';
 import 'package:car_sync/features/dummy/pages/home_scr.dart';
+import 'package:car_sync/features/customer/pages/home.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
-import 'package:car_sync/core/widgets/custom_textfield.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
-import 'package:car_sync/features/auth/presentation/pages/verify_email_page.dart';
+import 'package:car_sync/features/auth/pages/verify_email_page.dart';
+import 'package:car_sync/features/auth/pages/complete_profile_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/admin_home_scr.dart';
+import 'package:car_sync/main.dart';
 
 class LoginFormPage extends StatefulWidget {
   const LoginFormPage({super.key});
@@ -16,7 +19,10 @@ class LoginFormPage extends StatefulWidget {
 }
 
 class _LoginFormPageState extends State<LoginFormPage> {
-  final AuthService _authService = AuthService();
+  final AuthService _authService = AuthService(
+    clientId:
+        '925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com',
+  ); // client ID
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _resetEmailController = TextEditingController(); // For forgot password
@@ -373,21 +379,24 @@ class _LoginFormPageState extends State<LoginFormPage> {
         // Navigate to appropriate home screen based on role
         if (userRole == 'admin') {
           // Navigate to Admin Home Screen
-          Navigator.pushReplacement(
+          Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
+            (route) => false,
           );
-        } else if (userRole == 'technician') {
-          // Navigate to Technician Home Screen
-          Navigator.pushReplacement(
+        } else if (userRole == 'technician' || userRole == 'foreman') {
+          // Navigate to Technician/Foreman Home Screen
+          Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
           );
         } else {
-          // Default to Customer Home Screen
-          Navigator.pushReplacement(
+          // Default to Customer Home Screen (includes 'customer' role and null)
+          Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            MaterialPageRoute(builder: (context) => const CustomerHomePage()),
+            (route) => false,
           );
         }
       }
@@ -438,10 +447,68 @@ class _LoginFormPageState extends State<LoginFormPage> {
     }
   }
 
+  // Google Sign-In handler
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await _authService.signInWithGoogle();
+
+      if (result['cancelled'] == true) {
+        // User cancelled the sign-in
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      if (result['success'] == true) {
+        final needsProfileCompletion = result['needsProfileCompletion'];
+
+        print("Google Sign-In successful");
+        print("Needs profile completion: $needsProfileCompletion");
+
+        if (needsProfileCompletion == true) {
+          // Navigate to profile completion page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CompleteProfilePage(),
+            ),
+          );
+        } else {
+          // Profile complete - navigate to home
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const RoleBasedHomeLoader(),
+            ),
+          );
+        }
+      } else {
+        throw result['error'] ?? Exception('Google Sign-In failed');
+      }
+    } catch (e) {
+      print("Google Sign-In failed: $e");
+      if (mounted) {
+        _showErrorAlert(
+          "Google Sign-In Failed",
+          _authService.getErrorMessage(e),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
     return Scaffold(
       body: Stack(
         children: [
@@ -669,9 +736,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
                           /// Google Sign In Button
                           Center(
                             child: InkWell(
-                              onTap: () {
-                                // Google Sign In logic
-                              },
+                              onTap: _handleGoogleSignIn,
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
                                 width: double.infinity,

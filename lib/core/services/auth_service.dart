@@ -1,14 +1,151 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/core/services/auth_nav_flag.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  late final GoogleSignIn _googleSignIn;
   final StorageService _storageService = StorageService();
+
+  // Constructor with client ID
+  AuthService({String? clientId}) {
+    if (clientId != null && clientId.isNotEmpty) {
+      _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+    } else {
+      _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+    }
+  }
 
   // Current user
   User? get currentUser => _auth.currentUser;
+
+  // Google Sign-In (v6.2.0)
+  Future<Map<String, dynamic>> signInWithGoogle() async {
+    try {
+      print("Starting Google Sign-In...");
+
+      // Trigger the authentication flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // User canceled the sign-in
+        return {
+          'success': false,
+          'cancelled': true,
+          'user': null,
+          'needsProfileCompletion': false,
+        };
+      }
+
+      print("Google account selected: ${googleUser.email}");
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
+
+      final User? user = userCredential.user;
+
+      if (user != null) {
+        await AuthNavFlag.setSignedOutRecently(false);
+        final bool isNewUser =
+            userCredential.additionalUserInfo?.isNewUser ?? false;
+
+        // Check if user exists in Firestore
+        bool userExists = await _storageService.userExists(user.uid);
+
+        if (isNewUser || !userExists) {
+          // New Google user - save minimal data (no phone/dob)
+          await _storageService.saveGoogleUserData(
+            uid: user.uid,
+            email: user.email ?? '',
+            fullName: user.displayName ?? 'Google User',
+          );
+
+          print("New Google user - needs profile completion");
+
+          return {
+            'success': true,
+            'cancelled': false,
+            'user': user,
+            'needsProfileCompletion': true,
+          };
+        } else {
+          // Existing user - check if they have phone and dob
+          bool needsCompletion = await _storageService.needsProfileCompletion(
+            user.uid,
+          );
+
+          print("Existing Google user - needs completion: $needsCompletion");
+
+          return {
+            'success': true,
+            'cancelled': false,
+            'user': user,
+            'needsProfileCompletion': needsCompletion,
+          };
+        }
+      }
+
+      return {
+        'success': false,
+        'cancelled': false,
+        'user': null,
+        'needsProfileCompletion': false,
+      };
+    } on FirebaseAuthException catch (e) {
+      print("FirebaseAuth error: ${e.code}");
+      return {
+        'success': false,
+        'cancelled': false,
+        'error': e,
+        'needsProfileCompletion': false,
+      };
+    } catch (e) {
+      print("Unexpected error: $e");
+      return {
+        'success': false,
+        'cancelled': false,
+        'error': e,
+        'needsProfileCompletion': false,
+      };
+    }
+  }
+
+  // Complete profile with phone and date of birth
+  Future<User?> completeUserProfile({
+    required String phone,
+    required DateTime dateOfBirth,
+  }) async {
+    try {
+      User? user = _auth.currentUser;
+      if (user == null) throw Exception('No user logged in');
+
+      await _storageService.completeUserProfile(
+        uid: user.uid,
+        phone: phone,
+        dateOfBirth: dateOfBirth,
+      );
+
+      print("Profile completed for user: ${user.uid}");
+      return user;
+    } catch (e) {
+      print("Error completing profile: $e");
+      throw e;
+    }
+  }
 
   // Sign in with email & password
   Future<User?> signInWithEmail(String email, String password) async {
@@ -23,19 +160,23 @@ class AuthService {
       User? user = result.user;
 
       // Check if email is verified
+      // TODO: Re-enable email verification check for production
+      // if (user != null) {
+      //   // Reload to get latest emailVerified status
+      //   await user.reload();
+      //   user = _auth.currentUser;
+
+      //   if (user != null && !user.emailVerified) {
+      //     print("Email not verified: $email");
+      //     await _auth.signOut();
+      //     throw Exception('email-not-verified');
+      //   }
+      // }
+
       if (user != null) {
-        // Reload to get latest emailVerified status
-        await user.reload();
-        user = _auth.currentUser;
-
-        if (user != null && !user.emailVerified) {
-          print("Email not verified: $email");
-          await _auth.signOut();
-          throw Exception('email-not-verified');
-        }
-
-        print("Login successful for: ${user?.email}");
-        return user; // Return the user on success
+        print("Login successful for: ${user.email}");
+        await AuthNavFlag.setSignedOutRecently(false);
+        return user;
       }
 
       return null;
@@ -153,17 +294,15 @@ class AuthService {
   Future<void> signOut() async {
     try {
       if (_auth.currentUser != null) {
-        print("👤 Current user: ${_auth.currentUser?.email}");
+        print("Current user: ${_auth.currentUser?.email}");
 
-        // sign out from Firebase
+        await AuthNavFlag.setSignedOutRecently(true);
+
         await _auth.signOut();
-
-        // sign out from Google
         await _googleSignIn.signOut();
 
         print("Sign out successful");
 
-        // verify sign out was successful
         assert(_auth.currentUser == null, "User should be null after sign out");
       } else {
         print("No user was logged in");
@@ -211,7 +350,7 @@ class AuthService {
     return 'An unexpected error occurred. Please try again.';
   }
 
- Future<User?> customerSignUp({
+  Future<User?> customerSignUp({
     required String email,
     required String password,
     required String fullName,
@@ -272,7 +411,9 @@ class AuthService {
     try {
       User? user = _auth.currentUser;
       if (user != null) {
-        Map<String, dynamic>? userData = await _storageService.getUserData(user.uid);
+        Map<String, dynamic>? userData = await _storageService.getUserData(
+          user.uid,
+        );
         return userData?['role'] as String?;
       }
       return null;

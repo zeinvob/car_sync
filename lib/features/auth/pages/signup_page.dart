@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
-import 'package:car_sync/features/auth/presentation/pages/login_form_page.dart';
-import 'package:car_sync/features/auth/presentation/pages/verify_email_page.dart';
+import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/features/auth/pages/verify_email_page.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -14,9 +14,9 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  final AuthService _authService = AuthService();
-
-  // Controllers for form fields
+  final AuthService _authService = AuthService(
+    clientId: '925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com',
+  ); // client ID 
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();

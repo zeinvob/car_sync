@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
-import 'package:car_sync/features/auth/presentation/pages/login_form_page.dart';
+import 'package:car_sync/features/auth/pages/login_form_page.dart';
 
 class VerifyEmailPage extends StatefulWidget {
   final String email;
@@ -15,7 +15,9 @@ class VerifyEmailPage extends StatefulWidget {
 }
 
 class _VerifyEmailPageState extends State<VerifyEmailPage> {
-  final AuthService _authService = AuthService();
+  final AuthService _authService = AuthService(
+    clientId: '925167052954-qoinl478sq840p93jubk7jrc3o6162um.apps.googleusercontent.com',
+  ); // client ID 
   bool _isResending = false;
   bool _isChecking = false;
 
