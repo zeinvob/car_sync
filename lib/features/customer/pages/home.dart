@@ -2,6 +2,7 @@ import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/services/storage_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/features/customer/pages/add_vehicle_page.dart';
 import 'package:car_sync/features/customer/pages/book_service_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +27,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   String _userName = '';
   String _userEmail = '';
   List<Map<String, dynamic>> _activeBookings = [];
+  List<Map<String, dynamic>> _vehicles = [];
 
   @override
   void initState() {
@@ -53,9 +55,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
         // Load active bookings for this customer
         final bookings = await _storageService.getCustomerBookings(user.uid);
+        final vehicles = await _storageService.getCustomerVehicles(user.uid);
         if (mounted) {
           setState(() {
             _activeBookings = bookings;
+            _vehicles = vehicles;
           });
         }
       }
@@ -785,74 +789,285 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                   ),
                 ),
                 IconButton(
-                  onPressed: () {
-                    // TODO: Add vehicle
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Add Vehicle coming soon!')),
-                    );
-                  },
+                  onPressed: () => _navigateToAddVehicle(),
                   icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
                 ),
               ],
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.directions_car_outlined,
-                      size: 80,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No Vehicles Added',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[600],
+              child: _vehicles.isEmpty
+                  ? _buildEmptyVehicles()
+                  : RefreshIndicator(
+                      onRefresh: _loadUserData,
+                      child: ListView.builder(
+                        itemCount: _vehicles.length,
+                        itemBuilder: (context, index) {
+                          return _buildVehicleCard(_vehicles[index]);
+                        },
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Add your vehicle to book services',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: Add vehicle
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Add Vehicle coming soon!')),
-                        );
-                      },
-                      icon: const Icon(Icons.add),
-                      label: Text(
-                        'Add Vehicle',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildEmptyVehicles() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.directions_car_outlined,
+            size: 80,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Vehicles Added',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add your vehicle to book services',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () => _navigateToAddVehicle(),
+            icon: const Icon(Icons.add),
+            label: Text(
+              'Add Vehicle',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVehicleCard(Map<String, dynamic> vehicle) {
+    final brand = vehicle['brand'] ?? '';
+    final model = vehicle['model'] ?? '';
+    final year = vehicle['year'] ?? '';
+    final plateNumber = vehicle['plateNumber'] ?? '';
+    final color = vehicle['color'] ?? '';
+    final transmission = vehicle['transmission'] ?? '';
+    final fuelType = vehicle['fuelType'] ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.directions_car,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$brand $model',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      Text(
+                        plateNumber,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _navigateToEditVehicle(vehicle);
+                    } else if (value == 'delete') {
+                      _confirmDeleteVehicle(vehicle);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit, size: 18),
+                          const SizedBox(width: 8),
+                          Text('Edit', style: GoogleFonts.poppins()),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.delete, size: 18, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Text('Delete', style: GoogleFonts.poppins(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (year.isNotEmpty) _buildInfoChip(Icons.calendar_today, year),
+                if (color.isNotEmpty) _buildInfoChip(Icons.palette, color),
+                if (transmission.isNotEmpty) _buildInfoChip(Icons.settings, transmission),
+                if (fuelType.isNotEmpty) _buildInfoChip(Icons.local_gas_station, fuelType),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey[600]),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: Colors.grey[700],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _navigateToAddVehicle() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddVehiclePage()),
+    );
+    if (result == true) {
+      _loadUserData();
+    }
+  }
+
+  Future<void> _navigateToEditVehicle(Map<String, dynamic> vehicle) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AddVehiclePage(existingVehicle: vehicle)),
+    );
+    if (result == true) {
+      _loadUserData();
+    }
+  }
+
+  Future<void> _confirmDeleteVehicle(Map<String, dynamic> vehicle) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Vehicle', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        content: Text(
+          'Are you sure you want to delete ${vehicle['brand']} ${vehicle['model']}?',
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: GoogleFonts.poppins()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _storageService.deleteVehicle(vehicle['id']);
+        _loadUserData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Vehicle deleted'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   /// ============ PROFILE TAB ============
