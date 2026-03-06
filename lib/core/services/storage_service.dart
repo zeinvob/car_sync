@@ -633,4 +633,103 @@ Future<void> saveGoogleUserData({
     return [];
   }
 }
+
+  /// Creates a new booking in Firestore
+  Future<String> createBooking({
+    required String customerId,
+    required String workshopId,
+    required String serviceType,
+    required DateTime bookingDate,
+    required String timeSlot,
+    String? notes,
+    String? vehicleId,
+  }) async {
+    try {
+      final docRef = await _firestore.collection('bookings').add({
+        'customerId': customerId,
+        'workshopId': workshopId,
+        'serviceType': serviceType,
+        'bookingDate': Timestamp.fromDate(bookingDate),
+        'slotTime': Timestamp.fromDate(bookingDate),
+        'timeSlot': timeSlot,
+        'notes': notes ?? '',
+        'vehicleId': vehicleId ?? '',
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      print('Booking created with ID: ${docRef.id}');
+      return docRef.id;
+    } catch (e) {
+      print('createBooking error: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets all bookings for a customer
+  Future<List<Map<String, dynamic>>> getCustomerBookings(String customerId) async {
+    try {
+      print('Fetching bookings for customer: $customerId');
+      
+      // Simple query without orderBy to avoid index requirement
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('customerId', isEqualTo: customerId)
+          .get();
+
+      print('Found ${snapshot.docs.length} bookings');
+
+      final List<Map<String, dynamic>> bookings = [];
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        print('Booking data: $data');
+        final workshopId = (data['workshopId'] ?? '').toString();
+        
+        // Get workshop details
+        Map<String, dynamic> workshopData = {};
+        if (workshopId.isNotEmpty) {
+          try {
+            final workshopDoc = await _firestore.collection('workshops').doc(workshopId).get();
+            if (workshopDoc.exists) {
+              workshopData = workshopDoc.data() ?? {};
+            }
+          } catch (e) {
+            print('Error loading workshop for booking ${doc.id}: $e');
+          }
+        }
+
+        bookings.add({
+          'id': doc.id,
+          'customerId': data['customerId'] ?? '',
+          'workshopId': workshopId,
+          'workshopName': workshopData['name'] ?? 'Unknown Workshop',
+          'workshopAddress': workshopData['address'] ?? '',
+          'serviceType': data['serviceType'] ?? '',
+          'status': data['status'] ?? 'pending',
+          'bookingDate': data['bookingDate'],
+          'slotTime': data['slotTime'],
+          'timeSlot': data['timeSlot'] ?? '',
+          'notes': data['notes'] ?? '',
+          'createdAt': data['createdAt'],
+          'updatedAt': data['updatedAt'],
+        });
+      }
+
+      // Sort locally by createdAt descending
+      bookings.sort((a, b) {
+        final aTime = a['createdAt'];
+        final bTime = b['createdAt'];
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+
+      return bookings;
+    } catch (e) {
+      print('getCustomerBookings error: $e');
+      return [];
+    }
+  }
 }

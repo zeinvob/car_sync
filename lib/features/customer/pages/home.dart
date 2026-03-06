@@ -2,6 +2,7 @@ import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/services/storage_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/features/customer/pages/book_service_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -50,8 +51,13 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           _userEmail = userData?['email'] ?? user.email ?? '';
         });
 
-        // TODO: Load active bookings for this customer
-        // _activeBookings = await _storageService.getCustomerBookings(user.uid);
+        // Load active bookings for this customer
+        final bookings = await _storageService.getCustomerBookings(user.uid);
+        if (mounted) {
+          setState(() {
+            _activeBookings = bookings;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error loading user data: $e');
@@ -238,11 +244,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 icon: Icons.calendar_month_outlined,
                 label: 'Book Service',
                 color: AppColors.primary,
-                onTap: () {
-                  // TODO: Navigate to booking page
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Book Service coming soon!')),
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const BookServicePage()),
                   );
+                  if (result == true) {
+                    _loadUserData(); // Refresh bookings
+                  }
                 },
               ),
             ),
@@ -383,11 +392,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () {
-                // TODO: Navigate to booking
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Book Service coming soon!')),
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BookServicePage()),
                 );
+                if (result == true) {
+                  _loadUserData(); // Refresh bookings
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -542,36 +554,211 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.event_note_outlined,
-                      size: 80,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No Bookings Yet',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[600],
+              child: _activeBookings.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.event_note_outlined,
+                            size: 80,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No Bookings Yet',
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Your booking history will appear here',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadUserData,
+                      child: ListView.builder(
+                        itemCount: _activeBookings.length,
+                        itemBuilder: (context, index) {
+                          final booking = _activeBookings[index];
+                          return _buildBookingCard(booking);
+                        },
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Your booking history will appear here',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookingCard(Map<String, dynamic> booking) {
+    final status = (booking['status'] ?? 'pending').toString().toLowerCase();
+    final serviceType = booking['serviceType'] ?? 'Service';
+    final workshopName = booking['workshopName'] ?? 'Workshop';
+    final timeSlot = booking['timeSlot'] ?? '';
+    
+    // Parse booking date
+    String dateStr = 'Pending';
+    if (booking['bookingDate'] != null) {
+      try {
+        final timestamp = booking['bookingDate'] as dynamic;
+        final date = timestamp.toDate();
+        dateStr = '${date.day}/${date.month}/${date.year}';
+      } catch (_) {}
+    }
+
+    Color statusColor;
+    IconData statusIcon;
+    switch (status) {
+      case 'confirmed':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        break;
+      case 'in_progress':
+      case 'inprogress':
+        statusColor = Colors.blue;
+        statusIcon = Icons.autorenew;
+        break;
+      case 'completed':
+        statusColor = Colors.grey;
+        statusIcon = Icons.task_alt;
+        break;
+      case 'cancelled':
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        break;
+      default: // pending
+        statusColor = Colors.orange;
+        statusIcon = Icons.schedule;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    serviceType,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(statusIcon, size: 14, color: statusColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        status[0].toUpperCase() + status.substring(1),
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.business, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    workshopName,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Text(
+                  dateStr,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                if (timeSlot.isNotEmpty) ...[
+                  const SizedBox(width: 16),
+                  Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Text(
+                    timeSlot,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (booking['notes']?.toString().isNotEmpty == true) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.note, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      booking['notes'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
