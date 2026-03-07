@@ -4,6 +4,7 @@ import 'package:car_sync/core/services/sparepart_service.dart';
 import 'package:car_sync/core/services/user_service.dart';
 import 'package:car_sync/core/services/vehicle_service.dart';
 import 'package:car_sync/core/services/workshop_service.dart';
+import 'package:flutter/material.dart';
 
 /// StorageService acts as a facade that delegates to individual services.
 /// This maintains backward compatibility with existing code while
@@ -126,6 +127,11 @@ class StorageService {
       _adminService.getAdminDashboardData();
 
   // ======================== BOOKING METHODS ========================
+
+  Future<List<TimeOfDay>> getAvailableSlots({
+    required String workshopId,
+    required DateTime date,
+  }) => _bookingService.getAvailableSlots(workshopId: workshopId, date: date);
 
   Future<String> createBooking({
     required String customerId,

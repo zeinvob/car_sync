@@ -272,11 +272,38 @@ class _BookServicePageState extends State<BookServicePage> {
     );
   }
 
+  Widget _buildImagePlaceholder({bool isLoading = false}) {
+    return Container(
+      height: 140,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.gradientStart.withOpacity(0.8),
+            AppColors.gradientEnd.withOpacity(0.8),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: isLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : Icon(
+                Icons.car_repair,
+                size: 60,
+                color: Colors.white.withOpacity(0.7),
+              ),
+      ),
+    );
+  }
+
   Widget _buildWorkshopCard(Map<String, dynamic> workshop) {
     final rating = (workshop['rating'] ?? 0).toDouble();
     final name = workshop['name'] ?? 'Workshop';
     final address = workshop['address'] ?? 'No address';
     final completedCount = workshop['completedCount'] ?? 0;
+    final imageUrl = workshop['imageUrl'] as String?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -294,64 +321,59 @@ class _BookServicePageState extends State<BookServicePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Workshop Image Placeholder
-          Container(
-            height: 140,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.gradientStart.withOpacity(0.8),
-                  AppColors.gradientEnd.withOpacity(0.8),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-            ),
-            child: Stack(
-              children: [
-                // Workshop Icon
-                Center(
-                  child: Icon(
-                    Icons.car_repair,
-                    size: 60,
-                    color: Colors.white.withOpacity(0.7),
+          // Workshop Image with Rating Badge
+          Stack(
+            children: [
+              // Image
+              Container(
+                height: 140,
+                width: double.infinity,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
                   ),
+                  child: imageUrl != null && imageUrl.isNotEmpty
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _buildImagePlaceholder(),
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return _buildImagePlaceholder(isLoading: true);
+                          },
+                        )
+                      : _buildImagePlaceholder(),
                 ),
-                
-                // Rating Badge
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 16),
-                        const SizedBox(width: 4),
-                        Text(
-                          rating.toStringAsFixed(1),
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
+              ),
+              // Rating Badge
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        rating.toStringAsFixed(1),
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
 
           // Workshop Details
@@ -626,7 +648,7 @@ class _BookingFormSheet extends StatefulWidget {
 
 class _BookingFormSheetState extends State<_BookingFormSheet> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  TimeOfDay _selectedTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay? _selectedTime;
   String _selectedService = 'General Service';
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
@@ -635,6 +657,10 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
   List<Map<String, dynamic>> _vehicles = [];
   String? _selectedVehicleId;
   bool _isLoadingVehicles = true;
+
+  // Available time slots
+  List<TimeOfDay> _availableSlots = [];
+  bool _isLoadingSlots = true;
 
   final List<String> _services = [
     'General Service',
@@ -651,6 +677,7 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
   void initState() {
     super.initState();
     _loadVehicles();
+    _loadAvailableSlots();
   }
 
   Future<void> _loadVehicles() async {
@@ -680,6 +707,39 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
     }
   }
 
+  Future<void> _loadAvailableSlots() async {
+    setState(() {
+      _isLoadingSlots = true;
+      _selectedTime = null;
+    });
+
+    try {
+      final storageService = StorageService();
+      final workshopId = widget.workshop['id'] ?? '';
+      
+      final slots = await storageService.getAvailableSlots(
+        workshopId: workshopId,
+        date: _selectedDate,
+      );
+
+      if (mounted) {
+        setState(() {
+          _availableSlots = slots;
+          // Auto-select first available slot
+          if (slots.isNotEmpty) {
+            _selectedTime = slots.first;
+          }
+          _isLoadingSlots = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading slots: $e');
+      if (mounted) {
+        setState(() => _isLoadingSlots = false);
+      }
+    }
+  }
+
   @override
   void dispose() {
     _notesController.dispose();
@@ -697,16 +757,8 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
     );
     if (picked != null) {
       setState(() => _selectedDate = picked);
-    }
-  }
-
-  Future<void> _selectTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime,
-    );
-    if (picked != null) {
-      setState(() => _selectedTime = picked);
+      // Reload available slots for new date
+      _loadAvailableSlots();
     }
   }
 
@@ -732,6 +784,17 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
       return;
     }
 
+    // Validate time slot selection
+    if (_selectedTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a time slot'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -748,8 +811,8 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
         _selectedDate.year,
         _selectedDate.month,
         _selectedDate.day,
-        _selectedTime.hour,
-        _selectedTime.minute,
+        _selectedTime!.hour,
+        _selectedTime!.minute,
       );
 
       // Save booking to Firestore with selected vehicle
@@ -765,10 +828,31 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
       widget.onBookingComplete();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Booking failed: $e'),
-            backgroundColor: Colors.red,
+        String errorMessage = 'Booking failed. Please try again.';
+        
+        // Check for slot not available error
+        if (e.toString().contains('slot-not-available')) {
+          errorMessage = 'This time slot is already booked. Please select a different time.';
+        }
+        
+        // Show error dialog for better visibility
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red),
+                const SizedBox(width: 8),
+                const Text('Booking Failed'),
+              ],
+            ),
+            content: Text(errorMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
           ),
         );
       }
@@ -1013,29 +1097,88 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: _selectTime,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.access_time, size: 18, color: AppColors.primary),
-                              const SizedBox(width: 8),
-                              Text(
-                                _selectedTime.format(context),
-                                style: GoogleFonts.poppins(fontSize: 14),
+                      _isLoadingSlots
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Loading...',
+                                    style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : _availableSlots.isEmpty
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.red[300]!),
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: Colors.red[50],
+                                  ),
+                                  child: Text(
+                                    'Fully booked',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      color: Colors.red[700],
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<TimeOfDay>(
+                                      value: _selectedTime,
+                                      isExpanded: true,
+                                      hint: Text(
+                                        'Select time',
+                                        style: GoogleFonts.poppins(fontSize: 14),
+                                      ),
+                                      items: _availableSlots.map((slot) {
+                                        final hour = slot.hour;
+                                        final period = hour >= 12 ? 'PM' : 'AM';
+                                        final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+                                        return DropdownMenuItem(
+                                          value: slot,
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.access_time, size: 16, color: AppColors.primary),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '$displayHour:00 $period',
+                                                style: GoogleFonts.poppins(fontSize: 14),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                      onChanged: (value) {
+                                        setState(() => _selectedTime = value);
+                                      },
+                                    ),
+                                  ),
+                                ),
                     ],
                   ),
                 ),

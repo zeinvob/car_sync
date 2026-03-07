@@ -36,6 +36,10 @@ class WorkshopService {
           'address': data['address'] ?? 'No address',
           'rating': data['rating'] ?? 0,
           'isActive': data['isActive'] ?? false,
+          'imageUrl': data['imageUrl'] ?? '',
+          'phone': data['phone'] ?? '',
+          'email': data['email'] ?? '',
+          'description': data['description'] ?? '',
           'bookingCount': activeBookingCount,
           'completedCount': completedBookingCount,
         };

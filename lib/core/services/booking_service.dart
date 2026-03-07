@@ -1,8 +1,120 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 /// Service for booking-related Firestore operations
 class BookingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  /// All possible time slots (9am - 5pm)
+  static const List<TimeOfDay> allTimeSlots = [
+    TimeOfDay(hour: 9, minute: 0),
+    TimeOfDay(hour: 10, minute: 0),
+    TimeOfDay(hour: 11, minute: 0),
+    TimeOfDay(hour: 12, minute: 0),
+    TimeOfDay(hour: 13, minute: 0),
+    TimeOfDay(hour: 14, minute: 0),
+    TimeOfDay(hour: 15, minute: 0),
+    TimeOfDay(hour: 16, minute: 0),
+    TimeOfDay(hour: 17, minute: 0),
+  ];
+
+  /// Get available time slots for a workshop on a specific date
+  Future<List<TimeOfDay>> getAvailableSlots({
+    required String workshopId,
+    required DateTime date,
+  }) async {
+    try {
+      // Query all bookings for this workshop
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('workshopId', isEqualTo: workshopId)
+          .get();
+
+      // Get booked hours for the selected date
+      final bookedHours = <int>{};
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final status = (data['status'] ?? '').toString().toLowerCase();
+        
+        // Skip cancelled bookings
+        if (status == 'cancelled') continue;
+        
+        final bookingTimestamp = data['bookingDate'];
+        if (bookingTimestamp == null) continue;
+        
+        final existingDate = (bookingTimestamp as Timestamp).toDate();
+        
+        // Check if same day
+        if (existingDate.year == date.year &&
+            existingDate.month == date.month &&
+            existingDate.day == date.day) {
+          bookedHours.add(existingDate.hour);
+        }
+      }
+
+      // Filter out booked slots
+      final availableSlots = allTimeSlots
+          .where((slot) => !bookedHours.contains(slot.hour))
+          .toList();
+
+      print('Available slots for $workshopId on ${date.toString()}: ${availableSlots.length}');
+      
+      return availableSlots;
+    } catch (e) {
+      print('getAvailableSlots error: $e');
+      // Return all slots if we can't check
+      return List.from(allTimeSlots);
+    }
+  }
+
+  /// Check if a time slot is already booked at a workshop
+  Future<bool> isSlotAvailable({
+    required String workshopId,
+    required DateTime bookingDate,
+  }) async {
+    try {
+      // Create a time window (same hour slot)
+      final slotStart = DateTime(
+        bookingDate.year,
+        bookingDate.month,
+        bookingDate.day,
+        bookingDate.hour,
+        0,
+      );
+      final slotEnd = slotStart.add(const Duration(hours: 1));
+
+      // Query all bookings for this workshop (avoid compound index requirement)
+      final snapshot = await _firestore
+          .collection('bookings')
+          .where('workshopId', isEqualTo: workshopId)
+          .get();
+
+      // Filter locally for the time slot and active status
+      final conflictingBookings = snapshot.docs.where((doc) {
+        final data = doc.data();
+        final status = (data['status'] ?? '').toString().toLowerCase();
+        
+        // Skip cancelled bookings
+        if (status == 'cancelled') return false;
+        
+        // Check if booking is in the same time slot
+        final bookingTimestamp = data['bookingDate'];
+        if (bookingTimestamp == null) return false;
+        
+        final existingDate = (bookingTimestamp as Timestamp).toDate();
+        return existingDate.isAfter(slotStart.subtract(const Duration(seconds: 1))) &&
+               existingDate.isBefore(slotEnd);
+      }).toList();
+
+      print('Slot check: workshopId=$workshopId, slot=${slotStart.toString()}, conflicts=${conflictingBookings.length}');
+      
+      return conflictingBookings.isEmpty;
+    } catch (e) {
+      print('isSlotAvailable error: $e');
+      // If we can't check, block the booking to be safe
+      throw Exception('Unable to verify slot availability. Please try again.');
+    }
+  }
 
   /// Creates a new booking in Firestore
   Future<String> createBooking({
@@ -14,6 +126,16 @@ class BookingService {
     String? vehicleId,
   }) async {
     try {
+      // Check if slot is available before booking
+      final isAvailable = await isSlotAvailable(
+        workshopId: workshopId,
+        bookingDate: bookingDate,
+      );
+
+      if (!isAvailable) {
+        throw Exception('slot-not-available');
+      }
+
       final docRef = await _firestore.collection('bookings').add({
         'customerId': customerId,
         'workshopId': workshopId,

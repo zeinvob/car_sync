@@ -624,27 +624,39 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
     Color statusColor;
     IconData statusIcon;
+    String statusLabel;
+    
     switch (status) {
+      case 'requested':
+        statusColor = Colors.purple;
+        statusIcon = Icons.pending_actions;
+        statusLabel = 'Requested';
+        break;
       case 'confirmed':
         statusColor = Colors.green;
         statusIcon = Icons.check_circle;
+        statusLabel = 'Confirmed';
         break;
       case 'in_progress':
       case 'inprogress':
         statusColor = Colors.blue;
-        statusIcon = Icons.autorenew;
+        statusIcon = Icons.build_circle;
+        statusLabel = 'In Progress';
         break;
       case 'completed':
-        statusColor = Colors.grey;
+        statusColor = Colors.teal;
         statusIcon = Icons.task_alt;
+        statusLabel = 'Completed';
         break;
       case 'cancelled':
         statusColor = Colors.red;
         statusIcon = Icons.cancel;
+        statusLabel = 'Cancelled';
         break;
-      default: // pending
-        statusColor = Colors.orange;
-        statusIcon = Icons.schedule;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.help_outline;
+        statusLabel = status[0].toUpperCase() + status.substring(1);
     }
 
     return Container(
@@ -690,7 +702,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       Icon(statusIcon, size: 14, color: statusColor),
                       const SizedBox(width: 4),
                       Text(
-                        status[0].toUpperCase() + status.substring(1),
+                        statusLabel,
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
