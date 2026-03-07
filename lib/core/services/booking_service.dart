@@ -330,4 +330,22 @@ class BookingService {
       print('updateBookingStatus error: $e');
     }
   }
+
+  /// Stream of active bookings count (for admin notifications)
+  Stream<int> getActiveBookingsCountStream() {
+    return _firestore.collection('bookings').snapshots().map((snapshot) {
+      int count = 0;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final status = (data['status'] ?? '').toString().toLowerCase();
+
+        if (status != 'completed' && status != 'cancelled') {
+          count++;
+        }
+      }
+
+      return count;
+    });
+  }
 }
