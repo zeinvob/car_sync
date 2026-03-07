@@ -38,8 +38,11 @@ class StorageService {
     required String uid,
     required String email,
     required String fullName,
-  }) =>
-      _userService.saveGoogleUserData(uid: uid, email: email, fullName: fullName);
+  }) => _userService.saveGoogleUserData(
+    uid: uid,
+    email: email,
+    fullName: fullName,
+  );
 
   Future<bool> needsProfileCompletion(String uid) =>
       _userService.needsProfileCompletion(uid);
@@ -48,12 +51,11 @@ class StorageService {
     required String uid,
     required String phone,
     required DateTime dateOfBirth,
-  }) =>
-      _userService.completeUserProfile(
-        uid: uid,
-        phone: phone,
-        dateOfBirth: dateOfBirth,
-      );
+  }) => _userService.completeUserProfile(
+    uid: uid,
+    phone: phone,
+    dateOfBirth: dateOfBirth,
+  );
 
   Future<void> saveCustomerData({
     required String uid,
@@ -62,15 +64,14 @@ class StorageService {
     required String phone,
     required DateTime dateOfBirth,
     required bool emailVerified,
-  }) =>
-      _userService.saveCustomerData(
-        uid: uid,
-        email: email,
-        fullName: fullName,
-        phone: phone,
-        dateOfBirth: dateOfBirth,
-        emailVerified: emailVerified,
-      );
+  }) => _userService.saveCustomerData(
+    uid: uid,
+    email: email,
+    fullName: fullName,
+    phone: phone,
+    dateOfBirth: dateOfBirth,
+    emailVerified: emailVerified,
+  );
 
   Future<void> saveUserData({
     required String uid,
@@ -79,15 +80,14 @@ class StorageService {
     required String phone,
     required DateTime dateOfBirth,
     required bool emailVerified,
-  }) =>
-      _userService.saveUserData(
-        uid: uid,
-        email: email,
-        fullName: fullName,
-        phone: phone,
-        dateOfBirth: dateOfBirth,
-        emailVerified: emailVerified,
-      );
+  }) => _userService.saveUserData(
+    uid: uid,
+    email: email,
+    fullName: fullName,
+    phone: phone,
+    dateOfBirth: dateOfBirth,
+    emailVerified: emailVerified,
+  );
 
   Future<String?> getUserRole(String uid) => _userService.getUserRole(uid);
 
@@ -99,13 +99,12 @@ class StorageService {
     String? fullName,
     String? phone,
     DateTime? dateOfBirth,
-  }) =>
-      _userService.updateUserData(
-        uid: uid,
-        fullName: fullName,
-        phone: phone,
-        dateOfBirth: dateOfBirth,
-      );
+  }) => _userService.updateUserData(
+    uid: uid,
+    fullName: fullName,
+    phone: phone,
+    dateOfBirth: dateOfBirth,
+  );
 
   Future<void> updateEmailVerified(String uid, bool verified) =>
       _userService.updateEmailVerified(uid, verified);
@@ -120,15 +119,14 @@ class StorageService {
     required String phone,
     required String createdBy,
     List<String> assignedSites = const [],
-  }) =>
-      _adminService.createForemanAccount(
-        uid: uid,
-        email: email,
-        fullName: fullName,
-        phone: phone,
-        createdBy: createdBy,
-        assignedSites: assignedSites,
-      );
+  }) => _adminService.createForemanAccount(
+    uid: uid,
+    email: email,
+    fullName: fullName,
+    phone: phone,
+    createdBy: createdBy,
+    assignedSites: assignedSites,
+  );
 
   Future<List<Map<String, dynamic>>> getAllForemen() =>
       _adminService.getAllForemen();
@@ -148,8 +146,7 @@ class StorageService {
   Future<List<TimeOfDay>> getAvailableSlots({
     required String workshopId,
     required DateTime date,
-  }) =>
-      _bookingService.getAvailableSlots(workshopId: workshopId, date: date);
+  }) => _bookingService.getAvailableSlots(workshopId: workshopId, date: date);
 
   Future<String> createBooking({
     required String customerId,
@@ -158,15 +155,58 @@ class StorageService {
     required DateTime bookingDate,
     String? notes,
     String? vehicleId,
-  }) =>
-      _bookingService.createBooking(
-        customerId: customerId,
+  }) async {
+    final bookingId = await _bookingService.createBooking(
+      customerId: customerId,
+      workshopId: workshopId,
+      serviceType: serviceType,
+      bookingDate: bookingDate,
+      notes: notes,
+      vehicleId: vehicleId,
+    );
+
+    try {
+      // Load workshop info
+      final workshopDoc = await _firestore
+          .collection('workshops')
+          .doc(workshopId)
+          .get();
+      final workshopData = workshopDoc.data() ?? {};
+      final workshopName = (workshopData['name'] ?? 'Workshop').toString();
+
+      // Load customer info
+      final customerDoc = await _firestore
+          .collection('users')
+          .doc(customerId)
+          .get();
+      final customerData = customerDoc.data() ?? {};
+      final customerName =
+          (customerData['name'] ??
+                  customerData['fullName'] ??
+                  customerData['username'] ??
+                  'Customer')
+              .toString();
+
+      // Notify admins
+      await createNewBookingNotificationForAdmins(
+        bookingId: bookingId,
         workshopId: workshopId,
-        serviceType: serviceType,
-        bookingDate: bookingDate,
-        notes: notes,
-        vehicleId: vehicleId,
+        workshopName: workshopName,
+        customerName: customerName,
       );
+
+      // Optional: notify workshops too
+      await createNewBookingNotificationForWorkshops(
+        bookingId: bookingId,
+        workshopId: workshopId,
+        customerName: customerName,
+      );
+    } catch (e) {
+      debugPrint('Booking created but notification failed: $e');
+    }
+
+    return bookingId;
+  }
 
   Future<List<Map<String, dynamic>>> getCustomerBookings(String customerId) =>
       _bookingService.getCustomerBookings(customerId);
@@ -177,11 +217,10 @@ class StorageService {
   Future<void> updateBookingStatus({
     required String bookingId,
     required String newStatus,
-  }) =>
-      _bookingService.updateBookingStatus(
-        bookingId: bookingId,
-        newStatus: newStatus,
-      );
+  }) => _bookingService.updateBookingStatus(
+    bookingId: bookingId,
+    newStatus: newStatus,
+  );
 
   Stream<int> getActiveBookingsCountStream() =>
       _bookingService.getActiveBookingsCountStream();
@@ -199,18 +238,17 @@ class StorageService {
     String? transmission,
     String? fuelType,
     String? notes,
-  }) =>
-      _vehicleService.addVehicle(
-        customerId: customerId,
-        brand: brand,
-        model: model,
-        year: year,
-        plateNumber: plateNumber,
-        color: color,
-        transmission: transmission,
-        fuelType: fuelType,
-        notes: notes,
-      );
+  }) => _vehicleService.addVehicle(
+    customerId: customerId,
+    brand: brand,
+    model: model,
+    year: year,
+    plateNumber: plateNumber,
+    color: color,
+    transmission: transmission,
+    fuelType: fuelType,
+    notes: notes,
+  );
 
   Future<List<Map<String, dynamic>>> getCustomerVehicles(String customerId) =>
       _vehicleService.getCustomerVehicles(customerId);
@@ -218,8 +256,7 @@ class StorageService {
   Future<void> updateVehicle({
     required String vehicleId,
     required Map<String, dynamic> data,
-  }) =>
-      _vehicleService.updateVehicle(vehicleId: vehicleId, data: data);
+  }) => _vehicleService.updateVehicle(vehicleId: vehicleId, data: data);
 
   Future<void> deleteVehicle(String vehicleId) =>
       _vehicleService.deleteVehicle(vehicleId);
@@ -230,8 +267,7 @@ class StorageService {
   Future<List<Map<String, dynamic>>> getWorkshopList({
     double? userLat,
     double? userLon,
-  }) =>
-      _workshopService.getWorkshopList(userLat: userLat, userLon: userLon);
+  }) => _workshopService.getWorkshopList(userLat: userLat, userLon: userLon);
 
   // ======================== SPARE PARTS METHODS ========================
   // Delegated to SparePartService
@@ -260,20 +296,18 @@ class StorageService {
     required String userName,
     required double rating,
     required String comment,
-  }) =>
-      _reviewService.addReview(
-        workshopId: workshopId,
-        userId: userId,
-        userName: userName,
-        rating: rating,
-        comment: comment,
-      );
+  }) => _reviewService.addReview(
+    workshopId: workshopId,
+    userId: userId,
+    userName: userName,
+    rating: rating,
+    comment: comment,
+  );
 
   Future<bool> canUserReview({
     required String workshopId,
     required String userId,
-  }) =>
-      _reviewService.canUserReview(workshopId: workshopId, userId: userId);
+  }) => _reviewService.canUserReview(workshopId: workshopId, userId: userId);
 
   Future<List<Map<String, dynamic>>> getUserReviews(String userId) =>
       _reviewService.getUserReviews(userId);
