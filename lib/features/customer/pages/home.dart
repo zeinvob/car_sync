@@ -4,6 +4,7 @@ import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
 import 'package:car_sync/features/customer/pages/add_vehicle_page.dart';
 import 'package:car_sync/features/customer/pages/book_service_page.dart';
+import 'package:car_sync/features/customer/pages/booking_details_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -606,7 +607,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Widget _buildBookingCard(Map<String, dynamic> booking) {
-    final status = (booking['status'] ?? 'pending').toString().toLowerCase();
+    final status = (booking['status'] ?? 'pending').toString().toLowerCase().trim();
     final serviceType = booking['serviceType'] ?? 'Service';
     final workshopName = booking['workshopName'] ?? 'Workshop';
     
@@ -623,40 +624,36 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     }
 
     Color statusColor;
-    IconData statusIcon;
     String statusLabel;
     
     switch (status) {
       case 'requested':
-        statusColor = Colors.purple;
-        statusIcon = Icons.pending_actions;
+        statusColor = const Color.fromARGB(255, 251, 139, 176);
         statusLabel = 'Requested';
         break;
       case 'confirmed':
         statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
         statusLabel = 'Confirmed';
         break;
       case 'in_progress':
-      case 'inprogress':
-        statusColor = Colors.blue;
-        statusIcon = Icons.build_circle;
+        statusColor = Colors.blueGrey;
         statusLabel = 'In Progress';
         break;
       case 'completed':
         statusColor = Colors.teal;
-        statusIcon = Icons.task_alt;
         statusLabel = 'Completed';
         break;
       case 'cancelled':
         statusColor = Colors.red;
-        statusIcon = Icons.cancel;
         statusLabel = 'Cancelled';
         break;
       default:
         statusColor = Colors.grey;
-        statusIcon = Icons.help_outline;
-        statusLabel = status[0].toUpperCase() + status.substring(1);
+        // Convert snake_case to Title Case (e.g., "in_progress" -> "In Progress")
+        statusLabel = status
+            .split('_')
+            .map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '')
+            .join(' ');
     }
 
     return Container(
@@ -679,6 +676,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
@@ -690,26 +688,24 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 14, color: statusColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        statusLabel,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: statusColor,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    statusLabel,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor,
+                      height: 1.2,
+                    ),
                   ),
                 ),
               ],
@@ -795,8 +791,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ],
               ),
             ],
-            // Cancel button - only show for non-completed/non-cancelled bookings
-            if (status != 'completed' && status != 'cancelled') ...[
+            // Cancel button - only show for requested/confirmed (before in_progress)
+            if (status == 'requested' || status == 'confirmed') ...[
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -821,10 +817,45 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
               ),
             ],
+            // View Details button - show for in_progress, completed, and any other status except requested/confirmed/cancelled
+            if (status != 'requested' && status != 'confirmed' && status != 'cancelled') ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showBookingDetailsDialog(booking),
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  label: Text(
+                    'View Details',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  void _showBookingDetailsDialog(Map<String, dynamic> booking) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BookingDetailsPage(booking: booking),
+      ),
+    ).then((_) => _loadUserData()); // Refresh on return
   }
 
   void _showCancelBookingDialog(Map<String, dynamic> booking) {
