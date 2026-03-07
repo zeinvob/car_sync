@@ -154,18 +154,18 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     if (!_showPast) {
       final now = DateTime.now();
       result = result.where((b) {
-        final dt = _timestampToDate(b['slotTime']);
+        final dt = _timestampToDate(b['bookingDate']);
         if (dt == null) return true;
         return dt.isAfter(now.subtract(const Duration(minutes: 1)));
       }).toList();
     }
 
-    // 4) sort by slotTime:
+    // 4) sort by bookingDate:
     //    upcoming first; past goes down.
     final now = DateTime.now();
     result.sort((a, b) {
-      final aDt = _timestampToDate(a['slotTime']) ?? DateTime(1970);
-      final bDt = _timestampToDate(b['slotTime']) ?? DateTime(1970);
+      final aDt = _timestampToDate(a['bookingDate']) ?? DateTime(1970);
+      final bDt = _timestampToDate(b['bookingDate']) ?? DateTime(1970);
 
       final aIsPast = aDt.isBefore(now);
       final bIsPast = bDt.isBefore(now);
@@ -406,7 +406,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                                 const SizedBox(height: 4),
 
                                 Text(
-                                  "Slot Time: ${_formatTimestamp(booking['slotTime'])}",
+                                  "Booking: ${_formatTimestamp(booking['bookingDate'])}",
                                   style: GoogleFonts.poppins(
                                     fontSize: 12,
                                     color: onSurface.withOpacity(0.75),

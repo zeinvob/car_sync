@@ -609,15 +609,16 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final status = (booking['status'] ?? 'pending').toString().toLowerCase();
     final serviceType = booking['serviceType'] ?? 'Service';
     final workshopName = booking['workshopName'] ?? 'Workshop';
-    final timeSlot = booking['timeSlot'] ?? '';
     
-    // Parse booking date
+    // Parse booking date and time
     String dateStr = 'Pending';
+    String timeStr = '';
     if (booking['bookingDate'] != null) {
       try {
         final timestamp = booking['bookingDate'] as dynamic;
         final date = timestamp.toDate();
         dateStr = '${date.day}/${date.month}/${date.year}';
+        timeStr = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
       } catch (_) {}
     }
 
@@ -717,6 +718,25 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
               ],
             ),
+            // Vehicle info
+            if (booking['vehicleDisplay']?.toString().isNotEmpty == true) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.directions_car, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      booking['vehicleDisplay'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               children: [
@@ -729,12 +749,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     color: Colors.grey[700],
                   ),
                 ),
-                if (timeSlot.isNotEmpty) ...[
+                if (timeStr.isNotEmpty) ...[
                   const SizedBox(width: 16),
                   Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 8),
                   Text(
-                    timeSlot,
+                    timeStr,
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       color: Colors.grey[700],

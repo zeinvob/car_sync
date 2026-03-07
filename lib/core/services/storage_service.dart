@@ -132,7 +132,6 @@ class StorageService {
     required String workshopId,
     required String serviceType,
     required DateTime bookingDate,
-    required String timeSlot,
     String? notes,
     String? vehicleId,
   }) => _bookingService.createBooking(
@@ -140,7 +139,6 @@ class StorageService {
     workshopId: workshopId,
     serviceType: serviceType,
     bookingDate: bookingDate,
-    timeSlot: timeSlot,
     notes: notes,
     vehicleId: vehicleId,
   );

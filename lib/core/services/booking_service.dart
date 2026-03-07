@@ -10,7 +10,6 @@ class BookingService {
     required String workshopId,
     required String serviceType,
     required DateTime bookingDate,
-    required String timeSlot,
     String? notes,
     String? vehicleId,
   }) async {
@@ -20,11 +19,9 @@ class BookingService {
         'workshopId': workshopId,
         'serviceType': serviceType,
         'bookingDate': Timestamp.fromDate(bookingDate),
-        'slotTime': Timestamp.fromDate(bookingDate),
-        'timeSlot': timeSlot,
         'notes': notes ?? '',
         'vehicleId': vehicleId ?? '',
-        'status': 'pending',
+        'status': 'requested',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -54,6 +51,7 @@ class BookingService {
         final data = doc.data();
         print('Booking data: $data');
         final workshopId = (data['workshopId'] ?? '').toString();
+        final vehicleId = (data['vehicleId'] ?? '').toString();
         
         // Get workshop details
         Map<String, dynamic> workshopData = {};
@@ -68,6 +66,28 @@ class BookingService {
           }
         }
 
+        // Get vehicle details
+        Map<String, dynamic> vehicleData = {};
+        if (vehicleId.isNotEmpty) {
+          try {
+            final vehicleDoc = await _firestore.collection('vehicles').doc(vehicleId).get();
+            if (vehicleDoc.exists) {
+              vehicleData = vehicleDoc.data() ?? {};
+            }
+          } catch (e) {
+            print('Error loading vehicle for booking ${doc.id}: $e');
+          }
+        }
+
+        // Format vehicle display name
+        String vehicleDisplay = '';
+        if (vehicleData.isNotEmpty) {
+          final brand = vehicleData['brand'] ?? '';
+          final model = vehicleData['model'] ?? '';
+          final plateNo = vehicleData['plateNumber'] ?? vehicleData['plateNo'] ?? '';
+          vehicleDisplay = '$brand $model • $plateNo';
+        }
+
         bookings.add({
           'id': doc.id,
           'customerId': data['customerId'] ?? '',
@@ -77,8 +97,8 @@ class BookingService {
           'serviceType': data['serviceType'] ?? '',
           'status': data['status'] ?? 'pending',
           'bookingDate': data['bookingDate'],
-          'slotTime': data['slotTime'],
-          'timeSlot': data['timeSlot'] ?? '',
+          'vehicleId': vehicleId,
+          'vehicleDisplay': vehicleDisplay,
           'notes': data['notes'] ?? '',
           'createdAt': data['createdAt'],
           'updatedAt': data['updatedAt'],
@@ -144,7 +164,7 @@ class BookingService {
           'serviceType': data['serviceType'] ?? '',
           'status': data['status'] ?? '',
           'workshopId': data['workshopId'] ?? '',
-          'slotTime': data['slotTime'],
+          'bookingDate': data['bookingDate'],
           'createdAt': data['createdAt'],
           'updatedAt': data['updatedAt'],
         });
@@ -156,10 +176,10 @@ class BookingService {
         return status != 'completed' && status != 'cancelled';
       }).toList();
 
-      // Sort by slot time
+      // Sort by booking date
       filtered.sort((a, b) {
-        final aTime = a['slotTime'];
-        final bTime = b['slotTime'];
+        final aTime = a['bookingDate'];
+        final bTime = b['bookingDate'];
 
         if (aTime is Timestamp && bTime is Timestamp) {
           return aTime.toDate().compareTo(bTime.toDate());

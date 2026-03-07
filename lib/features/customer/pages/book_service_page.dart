@@ -631,6 +631,11 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
 
+  // Vehicle selection
+  List<Map<String, dynamic>> _vehicles = [];
+  String? _selectedVehicleId;
+  bool _isLoadingVehicles = true;
+
   final List<String> _services = [
     'General Service',
     'Oil Change',
@@ -641,6 +646,39 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
     'Battery Service',
     'Other',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVehicles();
+  }
+
+  Future<void> _loadVehicles() async {
+    try {
+      final authService = AuthService();
+      final storageService = StorageService();
+      final currentUser = authService.currentUser;
+
+      if (currentUser != null) {
+        final vehicles = await storageService.getCustomerVehicles(currentUser.uid);
+        if (mounted) {
+          setState(() {
+            _vehicles = vehicles;
+            // Auto-select first vehicle if available
+            if (vehicles.isNotEmpty) {
+              _selectedVehicleId = vehicles.first['id'];
+            }
+            _isLoadingVehicles = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading vehicles: $e');
+      if (mounted) {
+        setState(() => _isLoadingVehicles = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -673,6 +711,27 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
   }
 
   Future<void> _submitBooking() async {
+    // Validate vehicle selection
+    if (_vehicles.isNotEmpty && _selectedVehicleId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a vehicle'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_vehicles.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add a vehicle before booking'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -693,16 +752,14 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
         _selectedTime.minute,
       );
 
-      final timeSlot = '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
-
-      // Save booking to Firestore
+      // Save booking to Firestore with selected vehicle
       await storageService.createBooking(
         customerId: currentUser.uid,
         workshopId: widget.workshop['id'] ?? '',
         serviceType: _selectedService,
         bookingDate: bookingDateTime,
-        timeSlot: timeSlot,
         notes: _notesController.text.trim(),
+        vehicleId: _selectedVehicleId,
       );
 
       widget.onBookingComplete();
@@ -762,6 +819,104 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
               ),
             ),
             const SizedBox(height: 24),
+
+            // Vehicle Selection
+            Text(
+              'Select Vehicle',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            _isLoadingVehicles
+                ? Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Loading vehicles...',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _vehicles.isEmpty
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.orange[300]!),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.orange[50],
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No vehicles added. Please add a vehicle first.',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  color: Colors.orange[800],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedVehicleId,
+                            isExpanded: true,
+                            hint: Text(
+                              'Select a vehicle',
+                              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
+                            ),
+                            items: _vehicles.map((vehicle) {
+                              final brand = vehicle['brand'] ?? '';
+                              final model = vehicle['model'] ?? '';
+                              final plateNo = vehicle['plateNumber'] ?? vehicle['plateNo'] ?? '';
+                              return DropdownMenuItem(
+                                value: vehicle['id'] as String?,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.directions_car, size: 18, color: AppColors.primary),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        '$brand $model • $plateNo',
+                                        style: GoogleFonts.poppins(fontSize: 14),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() => _selectedVehicleId = value);
+                            },
+                          ),
+                        ),
+                      ),
+            const SizedBox(height: 20),
 
             // Service Type
             Text(
