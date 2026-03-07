@@ -197,8 +197,10 @@ class StorageService {
 
   // ======================== WORKSHOP METHODS ========================
 
-  Future<List<Map<String, dynamic>>> getWorkshopList() => 
-      _workshopService.getWorkshopList();
+  Future<List<Map<String, dynamic>>> getWorkshopList({
+    double? userLat,
+    double? userLon,
+  }) => _workshopService.getWorkshopList(userLat: userLat, userLon: userLon);
 
   // ======================== SPARE PART METHODS ========================
 

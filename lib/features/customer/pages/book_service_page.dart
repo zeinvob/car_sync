@@ -1,8 +1,10 @@
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/features/customer/pages/workshop_map_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class BookServicePage extends StatefulWidget {
@@ -20,11 +22,12 @@ class _BookServicePageState extends State<BookServicePage> {
   List<Map<String, dynamic>> _filteredWorkshops = [];
   bool _isLoading = true;
   String _sortBy = 'rating'; // 'rating', 'name', 'distance'
+  Position? _currentPosition;
 
   @override
   void initState() {
     super.initState();
-    _loadWorkshops();
+    _initializeWithLocation();
   }
 
   @override
@@ -33,11 +36,40 @@ class _BookServicePageState extends State<BookServicePage> {
     super.dispose();
   }
 
+  Future<void> _initializeWithLocation() async {
+    await _getCurrentLocation();
+    await _loadWorkshops();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+      
+      if (permission == LocationPermission.deniedForever) return;
+
+      _currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+    }
+  }
+
   Future<void> _loadWorkshops() async {
     setState(() => _isLoading = true);
 
     try {
-      final workshops = await _storageService.getWorkshopList();
+      final workshops = await _storageService.getWorkshopList(
+        userLat: _currentPosition?.latitude,
+        userLon: _currentPosition?.longitude,
+      );
       
       setState(() {
         _workshops = workshops.where((w) => w['isActive'] == true).toList();
@@ -83,7 +115,33 @@ class _BookServicePageState extends State<BookServicePage> {
           return nameA.compareTo(nameB);
         });
         break;
+      case 'distance':
+        _filteredWorkshops.sort((a, b) {
+          final distA = a['distance'] as double?;
+          final distB = b['distance'] as double?;
+          if (distA == null && distB == null) return 0;
+          if (distA == null) return 1;
+          if (distB == null) return -1;
+          return distA.compareTo(distB);
+        });
+        break;
     }
+  }
+
+  Future<void> _openMapView() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (context) => const WorkshopMapPage()),
+    );
+    
+    // If a workshop was selected from the map, open its details
+    if (result != null && mounted) {
+      _showWorkshopDetails(result);
+    }
+  }
+
+  void _showWorkshopDetails(Map<String, dynamic> workshop) {
+    _showBookingBottomSheet(workshop);
   }
 
   Future<void> _openMaps(String address) async {
@@ -203,6 +261,35 @@ class _BookServicePageState extends State<BookServicePage> {
               _buildSortChip('Rating', 'rating'),
               const SizedBox(width: 8),
               _buildSortChip('Name', 'name'),
+              const SizedBox(width: 8),
+              _buildSortChip('Distance', 'distance'),
+              const Spacer(),
+              // Map View Button
+              GestureDetector(
+                onTap: _openMapView,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.map, color: Colors.white, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Map',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -304,6 +391,7 @@ class _BookServicePageState extends State<BookServicePage> {
     final address = workshop['address'] ?? 'No address';
     final completedCount = workshop['completedCount'] ?? 0;
     final imageUrl = workshop['imageUrl'] as String?;
+    final distance = workshop['distance'] as double?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -435,6 +523,14 @@ class _BookServicePageState extends State<BookServicePage> {
                       _getRatingText(rating),
                       Colors.amber[700]!,
                     ),
+                    if (distance != null) ...[
+                      const SizedBox(width: 12),
+                      _buildStatChip(
+                        Icons.directions_car,
+                        '${distance.toStringAsFixed(1)} km',
+                        AppColors.primary,
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 16),
