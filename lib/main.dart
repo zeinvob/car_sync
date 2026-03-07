@@ -11,11 +11,15 @@ import 'package:car_sync/features/admin/presentation/pages/admin_home_scr.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/theme/theme_controller.dart';
 import 'package:car_sync/core/services/auth_nav_flag.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:car_sync/core/services/notification_service.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   runApp(const MyApp());
 }
 

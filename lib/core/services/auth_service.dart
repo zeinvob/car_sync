@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:car_sync/core/services/storage_service.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/services/auth_nav_flag.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -60,6 +62,7 @@ class AuthService {
 
       if (user != null) {
         await AuthNavFlag.setSignedOutRecently(false);
+        await NotificationService.instance.initialize();
         final bool isNewUser =
             userCredential.additionalUserInfo?.isNewUser ?? false;
 
@@ -124,33 +127,10 @@ class AuthService {
     }
   }
 
-  // Complete profile with phone and date of birth
-  Future<User?> completeUserProfile({
-    required String phone,
-    required DateTime dateOfBirth,
-  }) async {
-    try {
-      User? user = _auth.currentUser;
-      if (user == null) throw Exception('No user logged in');
-
-      await _storageService.completeUserProfile(
-        uid: user.uid,
-        phone: phone,
-        dateOfBirth: dateOfBirth,
-      );
-
-      print("Profile completed for user: ${user.uid}");
-      return user;
-    } catch (e) {
-      print("Error completing profile: $e");
-      throw e;
-    }
-  }
-
   // Sign in with email & password
   Future<User?> signInWithEmail(String email, String password) async {
     try {
-      print("🔄 Attempting login for: $email");
+      print("Attempting login for: $email");
 
       UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email,
@@ -175,6 +155,7 @@ class AuthService {
       if (user != null) {
         print("Login successful for: ${user.email}");
         await AuthNavFlag.setSignedOutRecently(false);
+        await NotificationService.instance.initialize();
         return user;
       }
 
@@ -184,6 +165,29 @@ class AuthService {
       throw e; // Re-throw to be handled by UI
     } catch (e) {
       print("Unexpected error: $e");
+      throw e;
+    }
+  }
+
+  // Complete profile with phone and date of birth
+  Future<User?> completeUserProfile({
+    required String phone,
+    required DateTime dateOfBirth,
+  }) async {
+    try {
+      User? user = _auth.currentUser;
+      if (user == null) throw Exception('No user logged in');
+
+      await _storageService.completeUserProfile(
+        uid: user.uid,
+        phone: phone,
+        dateOfBirth: dateOfBirth,
+      );
+
+      print("Profile completed for user: ${user.uid}");
+      return user;
+    } catch (e) {
+      print("Error completing profile: $e");
       throw e;
     }
   }
@@ -294,6 +298,12 @@ class AuthService {
     try {
       if (_auth.currentUser != null) {
         print("Current user: ${_auth.currentUser?.email}");
+
+        final role = await getCurrentUserRole();
+        if (role == 'admin') {
+          await FirebaseMessaging.instance.unsubscribeFromTopic('admin');
+          print("Unsubscribed from admin topic");
+        }
 
         await AuthNavFlag.setSignedOutRecently(true);
 
