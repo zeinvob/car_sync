@@ -1,5 +1,6 @@
 import 'package:car_sync/core/services/admin_service.dart';
 import 'package:car_sync/core/services/booking_service.dart';
+import 'package:car_sync/core/services/review_service.dart';
 import 'package:car_sync/core/services/sparepart_service.dart';
 import 'package:car_sync/core/services/user_service.dart';
 import 'package:car_sync/core/services/vehicle_service.dart';
@@ -17,6 +18,7 @@ import 'package:flutter/material.dart';
 /// - VehicleService: Customer vehicle management
 /// - WorkshopService: Workshop listing and details
 /// - SparePartService: Spare parts inventory
+/// - ReviewService: Workshop reviews and ratings
 class StorageService {
   // Singleton instances of individual services
   final UserService _userService = UserService();
@@ -25,6 +27,7 @@ class StorageService {
   final VehicleService _vehicleService = VehicleService();
   final WorkshopService _workshopService = WorkshopService();
   final SparePartService _sparePartService = SparePartService();
+  final ReviewService _reviewService = ReviewService();
 
   // ======================== USER METHODS ========================
 
@@ -214,4 +217,34 @@ class StorageService {
 
   Future<List<Map<String, dynamic>>> getRecentSpareParts() => 
       _sparePartService.getRecentSpareParts();
+
+  // ======================== REVIEW METHODS ========================
+
+  Future<List<Map<String, dynamic>>> getWorkshopReviews(String workshopId) =>
+      _reviewService.getWorkshopReviews(workshopId);
+
+  Future<void> addReview({
+    required String workshopId,
+    required String userId,
+    required String userName,
+    required double rating,
+    required String comment,
+  }) => _reviewService.addReview(
+    workshopId: workshopId,
+    userId: userId,
+    userName: userName,
+    rating: rating,
+    comment: comment,
+  );
+
+  Future<bool> canUserReview({
+    required String workshopId,
+    required String userId,
+  }) => _reviewService.canUserReview(
+    workshopId: workshopId,
+    userId: userId,
+  );
+
+  Future<List<Map<String, dynamic>>> getUserReviews(String userId) =>
+      _reviewService.getUserReviews(userId);
 }
