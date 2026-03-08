@@ -17,13 +17,33 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _chatScrollController = ScrollController();
-  
+
   // Status order for progress tracking
   final List<Map<String, dynamic>> _statusSteps = [
-    {'status': 'requested', 'label': 'Requested', 'icon': Icons.pending_actions},
-    {'status': 'confirmed', 'label': 'Confirmed', 'icon': Icons.check_circle},
-    {'status': 'in_progress', 'label': 'In Progress', 'icon': Icons.build_circle},
-    {'status': 'completed', 'label': 'Completed', 'icon': Icons.task_alt},
+    {
+      'status': 'requested',
+      'label': 'Requested',
+      'icon': Icons.pending_actions,
+      'description': 'Your booking request has been submitted. Waiting for admin to review. This process usually takes 1-2 hours.',
+    },
+    {
+      'status': 'confirmed',
+      'label': 'Confirmed',
+      'icon': Icons.check_circle,
+      'description': 'Your booking has been confirmed by the admin. Please arrive at the workshop on your scheduled date.',
+    },
+    {
+      'status': 'in_progress',
+      'label': 'In Progress',
+      'icon': Icons.build_circle,
+      'description': 'Your vehicle is currently being serviced. The technician will update the progress below.',
+    },
+    {
+      'status': 'completed',
+      'label': 'Completed',
+      'icon': Icons.task_alt,
+      'description': 'Service completed! Your vehicle is ready for pickup. Thank you for choosing us.',
+    },
   ];
 
   @override
@@ -34,31 +54,15 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   }
 
   int _getStatusIndex(String status) {
-    final index = _statusSteps.indexWhere((s) => s['status'] == status.toLowerCase());
+    final index =
+        _statusSteps.indexWhere((s) => s['status'] == status.toLowerCase());
     return index >= 0 ? index : 0;
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'requested':
-        return Colors.purple;
-      case 'confirmed':
-        return Colors.green;
-      case 'in_progress':
-        return Colors.orange;
-      case 'completed':
-        return Colors.teal;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final bookingId = widget.booking['id'] ?? '';
-    
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -68,6 +72,13 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () => _showChatDialog(context, bookingId),
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: 'Chat with Admin',
+          ),
+        ],
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: _firestore.collection('bookings').doc(bookingId).snapshots(),
@@ -87,145 +98,32 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
 
           final bookingData = snapshot.data!.data() as Map<String, dynamic>;
           bookingData['id'] = bookingId;
-          
-          return Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildStatusHeader(bookingData),
-                      const SizedBox(height: 24),
-                      _buildProgressTimeline(bookingData),
-                      const SizedBox(height: 24),
-                      _buildBookingInfo(bookingData),
-                      const SizedBox(height: 24),
-                      _buildChatSection(bookingId),
-                    ],
-                  ),
-                ),
-              ),
-              _buildMessageInput(bookingId),
-            ],
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHorizontalProgressTracker(bookingData),
+                const SizedBox(height: 24),
+                _buildStatusTimeline(bookingData, bookingId),
+              ],
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildStatusHeader(Map<String, dynamic> booking) {
-    final status = (booking['status'] ?? 'requested').toString().toLowerCase();
-    final statusColor = _getStatusColor(status);
-    final workshopName = booking['workshopName'] ?? widget.booking['workshopName'] ?? 'Workshop';
-    final serviceType = booking['serviceType'] ?? 'Service';
-    
-    String dateStr = '';
-    if (booking['bookingDate'] != null) {
-      try {
-        final date = (booking['bookingDate'] as Timestamp).toDate();
-        dateStr = '${date.day}/${date.month}/${date.year} at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-      } catch (_) {}
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [statusColor.withValues(alpha: 0.8), statusColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _getStatusLabel(status),
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            serviceType,
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.business, color: Colors.white70, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                workshopName,
-                style: GoogleFonts.poppins(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          if (dateStr.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today, color: Colors.white70, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  dateStr,
-                  style: GoogleFonts.poppins(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  String _getStatusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case 'requested':
-        return 'Requested';
-      case 'confirmed':
-        return 'Confirmed';
-      case 'in_progress':
-        return 'In Progress';
-      case 'completed':
-        return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  }
-
-  Widget _buildProgressTimeline(Map<String, dynamic> booking) {
-    final currentStatus = (booking['status'] ?? 'requested').toString().toLowerCase();
+  Widget _buildHorizontalProgressTracker(Map<String, dynamic> booking) {
+    final currentStatus =
+        (booking['status'] ?? 'requested').toString().toLowerCase();
     final currentIndex = _getStatusIndex(currentStatus);
     final isCancelled = currentStatus == 'cancelled';
+
+    if (isCancelled) {
+      return _buildCancelledStatus();
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -251,41 +149,107 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 20),
-          if (isCancelled)
-            _buildCancelledStatus()
-          else
-            ...List.generate(_statusSteps.length, (index) {
-              final step = _statusSteps[index];
-              final isCompleted = index <= currentIndex;
-              final isCurrent = index == currentIndex;
-              final isLast = index == _statusSteps.length - 1;
+          const SizedBox(height: 24),
+          Row(
+            children: List.generate(_statusSteps.length * 2 - 1, (index) {
+              if (index.isOdd) {
+                // Connector line
+                final stepIndex = index ~/ 2;
+                final isCompleted = stepIndex < currentIndex;
+                return Expanded(
+                  child: Container(
+                    height: 3,
+                    color: isCompleted ? AppColors.primary : Colors.grey.shade300,
+                  ),
+                );
+              } else {
+                // Circle icon
+                final stepIndex = index ~/ 2;
+                final step = _statusSteps[stepIndex];
+                final isCompleted = stepIndex <= currentIndex;
+                final isCurrent = stepIndex == currentIndex;
 
-              return _buildTimelineStep(
-                label: step['label'],
-                icon: step['icon'],
-                isCompleted: isCompleted,
-                isCurrent: isCurrent,
-                isLast: isLast,
-                timestamp: _getTimestampForStatus(booking, step['status']),
-              );
+                return _buildStepCircle(
+                  icon: step['icon'],
+                  isCompleted: isCompleted,
+                  isCurrent: isCurrent,
+                );
+              }
             }),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: _statusSteps.map((step) {
+              final stepIndex = _statusSteps.indexOf(step);
+              final isCompleted = stepIndex <= currentIndex;
+              final isCurrent = stepIndex == currentIndex;
+
+              return SizedBox(
+                width: 70,
+                child: Text(
+                  step['label'],
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+                    color: isCompleted
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Colors.grey,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStepCircle({
+    required IconData icon,
+    required bool isCompleted,
+    required bool isCurrent,
+  }) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: isCompleted ? AppColors.primary : Colors.grey.shade200,
+        shape: BoxShape.circle,
+        border: isCurrent
+            ? Border.all(color: AppColors.primary, width: 3)
+            : null,
+        boxShadow: isCurrent
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
+      ),
+      child: Icon(
+        icon,
+        color: isCompleted ? Colors.white : Colors.grey,
+        size: 20,
       ),
     );
   }
 
   Widget _buildCancelledStatus() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.red.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.cancel, color: Colors.red, size: 32),
-          const SizedBox(width: 12),
+          const Icon(Icons.cancel, color: Colors.red, size: 40),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,7 +257,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                 Text(
                   'Booking Cancelled',
                   style: GoogleFonts.poppins(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Colors.red,
                   ),
@@ -313,169 +277,16 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
     );
   }
 
-  Widget _buildTimelineStep({
-    required String label,
-    required IconData icon,
-    required bool isCompleted,
-    required bool isCurrent,
-    required bool isLast,
-    String? timestamp,
-  }) {
-    final color = isCompleted ? AppColors.primary : Colors.grey.shade300;
-    
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isCompleted ? color : Colors.grey.shade100,
-                shape: BoxShape.circle,
-                border: isCurrent
-                    ? Border.all(color: AppColors.primary, width: 3)
-                    : null,
-                boxShadow: isCurrent
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Icon(
-                icon,
-                color: isCompleted ? Colors.white : Colors.grey,
-                size: 20,
-              ),
-            ),
-            if (!isLast)
-              Container(
-                width: 3,
-                height: 40,
-                color: isCompleted ? color : Colors.grey.shade200,
-              ),
-          ],
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
-                    color: isCompleted
-                        ? Theme.of(context).colorScheme.onSurface
-                        : Colors.grey,
-                  ),
-                ),
-                if (timestamp != null)
-                  Text(
-                    timestamp,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
-                SizedBox(height: isLast ? 0 : 24),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildStatusTimeline(Map<String, dynamic> booking, String bookingId) {
+    final currentStatus =
+        (booking['status'] ?? 'requested').toString().toLowerCase();
+    final currentIndex = _getStatusIndex(currentStatus);
+    final isCancelled = currentStatus == 'cancelled';
 
-  String? _getTimestampForStatus(Map<String, dynamic> booking, String status) {
-    // You can add status history tracking in Firestore to show actual timestamps
-    // For now, we'll show the booking date for 'requested' and updatedAt for others
-    if (status == 'requested' && booking['createdAt'] != null) {
-      try {
-        final date = (booking['createdAt'] as Timestamp).toDate();
-        return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-      } catch (_) {}
+    if (isCancelled) {
+      return const SizedBox.shrink();
     }
-    return null;
-  }
 
-  Widget _buildBookingInfo(Map<String, dynamic> booking) {
-    final notes = booking['notes'] ?? '';
-    final vehicleId = booking['vehicleId'] ?? '';
-    
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Booking Information',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildInfoRow('Booking ID', widget.booking['id'] ?? '-'),
-          if (vehicleId.isNotEmpty) _buildInfoRow('Vehicle ID', vehicleId),
-          if (notes.isNotEmpty) _buildInfoRow('Notes', notes),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: Colors.grey[600],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChatSection(String bookingId) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -493,81 +304,671 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
-              const SizedBox(width: 8),
               Text(
-                'Messages',
+                'Status History',
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '#${bookingId.length > 8 ? bookingId.substring(0, 8).toUpperCase() : bookingId.toUpperCase()}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 250,
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('bookings')
-                  .doc(bookingId)
-                  .collection('messages')
-                  .orderBy('createdAt', descending: false)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.chat_bubble_outline,
-                            size: 48, color: Colors.grey[300]),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No messages yet',
-                          style: GoogleFonts.poppins(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Send a message to the workshop',
+          // Only show statuses that have been reached (completed or current)
+          ...List.generate(_statusSteps.length, (index) {
+            final step = _statusSteps[index];
+            final isCompleted = index <= currentIndex;
+            final isCurrent = index == currentIndex;
+
+            // Skip statuses that haven't been reached yet
+            if (!isCompleted && !isCurrent) {
+              return const SizedBox.shrink();
+            }
+
+            // Find the last visible item for proper styling
+            final isLastVisible = index == currentIndex;
+
+            return _buildStatusHistoryItem(
+              status: step['status'],
+              label: step['label'],
+              icon: step['icon'],
+              description: step['description'],
+              isCompleted: isCompleted,
+              isCurrent: isCurrent,
+              timestamp: _getTimestampForStatus(booking, step['status']),
+              isLast: isLastVisible,
+              booking: booking,
+              bookingId: bookingId,
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusHistoryItem({
+    required String status,
+    required String label,
+    required IconData icon,
+    required String description,
+    required bool isCompleted,
+    required bool isCurrent,
+    required String? timestamp,
+    required bool isLast,
+    required Map<String, dynamic> booking,
+    required String bookingId,
+  }) {
+    final showTechnicianUpdates = status == 'in_progress' && (isCompleted || isCurrent);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Point and Line
+          Column(
+            children: [
+              // Point/Dot
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: isCompleted ? AppColors.primary : Colors.grey.shade300,
+                  shape: BoxShape.circle,
+                  border: isCurrent
+                      ? Border.all(color: AppColors.primary, width: 3)
+                      : null,
+                  boxShadow: isCurrent
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
+                ),
+              ),
+              // Vertical Line
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    color: isCompleted ? AppColors.primary : Colors.grey.shade300,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          // Content
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          label,
                           style: GoogleFonts.poppins(
-                            color: Colors.grey[400],
-                            fontSize: 12,
+                            fontSize: 14,
+                            fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+                            color: isCompleted
+                                ? Theme.of(context).colorScheme.onSurface
+                                : Colors.grey,
                           ),
                         ),
-                      ],
+                      ),
+                      if (isCurrent)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'Current',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  if (timestamp != null && isCompleted)
+                    Text(
+                      timestamp,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    )
+                  else if (!isCompleted)
+                    Text(
+                      'Pending',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey.shade400,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
-                  );
-                }
-
-                final messages = snapshot.data!.docs;
-
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_chatScrollController.hasClients) {
-                    _chatScrollController.animateTo(
-                      _chatScrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  }
-                });
-
-                return ListView.builder(
-                  controller: _chatScrollController,
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final message = messages[index].data() as Map<String, dynamic>;
-                    final isMe = message['senderId'] ==
-                        FirebaseAuth.instance.currentUser?.uid;
-                    return _buildMessageBubble(message, isMe);
-                  },
-                );
-              },
+                  // Status Description
+                  if (isCurrent || isCompleted) ...[                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? AppColors.primary.withValues(alpha: 0.08)
+                            : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: isCurrent
+                            ? Border.all(color: AppColors.primary.withValues(alpha: 0.2))
+                            : null,
+                      ),
+                      child: Text(
+                        description,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: isCurrent
+                              ? Theme.of(context).colorScheme.onSurface
+                              : Colors.grey[600],
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                  // Technician Updates for In Progress
+                  if (showTechnicianUpdates)
+                    _buildTechnicianUpdates(bookingId),
+                ],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTechnicianUpdates(String bookingId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('repairUpdates')
+          .orderBy('createdAt', descending: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.hourglass_empty, size: 18, color: Colors.orange[700]),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Waiting for technician to start inspection...',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.orange[800],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final updates = snapshot.data!.docs;
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.engineering, size: 16, color: Colors.orange[700]),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Technician Updates',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.orange[800],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ...updates.map((doc) {
+                final update = doc.data() as Map<String, dynamic>;
+                return _buildUpdateItem(update);
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildUpdateItem(Map<String, dynamic> update) {
+    final type = update['type'] ?? 'update';
+    final title = update['title'] ?? 'Update';
+    final description = update['description'] ?? '';
+    
+    // Handle photos as either a single string or an array
+    List<String> photos = [];
+    final photosData = update['photos'];
+    if (photosData is List) {
+      photos = photosData.map((e) => e.toString()).toList();
+    } else if (photosData is String && photosData.isNotEmpty) {
+      photos = [photosData];
+    }
+
+    String timeStr = '';
+    if (update['createdAt'] != null) {
+      try {
+        final date = (update['createdAt'] as Timestamp).toDate();
+        timeStr =
+            '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      } catch (_) {}
+    }
+
+    IconData typeIcon;
+    Color typeColor;
+    switch (type) {
+      case 'inspection':
+        typeIcon = Icons.search;
+        typeColor = Colors.blue;
+        break;
+      case 'problem_found':
+        typeIcon = Icons.warning_amber;
+        typeColor = Colors.orange;
+        break;
+      case 'repair':
+        typeIcon = Icons.build;
+        typeColor = Colors.green;
+        break;
+      case 'parts':
+        typeIcon = Icons.settings;
+        typeColor = Colors.purple;
+        break;
+      case 'testing':
+        typeIcon = Icons.speed;
+        typeColor = Colors.teal;
+        break;
+      default:
+        typeIcon = Icons.info_outline;
+        typeColor = Colors.grey;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: typeColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(typeIcon, size: 14, color: typeColor),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      timeStr,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.grey[700],
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (photos.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 80,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: photos.length,
+                itemBuilder: (context, index) {
+                  return GestureDetector(
+                    onTap: () => _showPhotoFullScreen(photos[index]),
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: NetworkImage(photos[index]),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showPhotoFullScreen(String photoUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Image.network(
+                photoUrl,
+                fit: BoxFit.contain,
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? _getTimestampForStatus(Map<String, dynamic> booking, String status) {
+    // Check for status history timestamps
+    final statusHistory = booking['statusHistory'] as Map<String, dynamic>?;
+    if (statusHistory != null && statusHistory[status] != null) {
+      try {
+        final date = (statusHistory[status] as Timestamp).toDate();
+        return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      } catch (_) {}
+    }
+
+    // Fallback: show createdAt for requested
+    if (status == 'requested' && booking['createdAt'] != null) {
+      try {
+        final date = (booking['createdAt'] as Timestamp).toDate();
+        return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      } catch (_) {}
+    }
+
+    // Fallback: show updatedAt for confirmed status
+    if (status == 'confirmed' && booking['updatedAt'] != null) {
+      try {
+        final date = (booking['updatedAt'] as Timestamp).toDate();
+        return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      } catch (_) {}
+    }
+
+    // Fallback: show updatedAt for current status
+    final currentStatus =
+        (booking['status'] ?? '').toString().toLowerCase();
+    if (status == currentStatus && booking['updatedAt'] != null) {
+      try {
+        final date = (booking['updatedAt'] as Timestamp).toDate();
+        return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
+  void _showChatDialog(BuildContext context, String bookingId) {
+    showDialog(
+      context: context,
+      builder: (context) => _ChatDialog(
+        bookingId: bookingId,
+        firestore: _firestore,
+      ),
+    );
+  }
+}
+
+class _ChatDialog extends StatefulWidget {
+  final String bookingId;
+  final FirebaseFirestore firestore;
+
+  const _ChatDialog({
+    required this.bookingId,
+    required this.firestore,
+  });
+
+  @override
+  State<_ChatDialog> createState() => _ChatDialogState();
+}
+
+class _ChatDialogState extends State<_ChatDialog> {
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.6,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Chat with Admin',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            // Messages
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: widget.firestore
+                    .collection('bookings')
+                    .doc(widget.bookingId)
+                    .collection('messages')
+                    .orderBy('createdAt', descending: false)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.chat_bubble_outline,
+                              size: 48, color: Colors.grey[300]),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No messages yet',
+                            style: GoogleFonts.poppins(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Send a message to the admin',
+                            style: GoogleFonts.poppins(
+                              color: Colors.grey[400],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final messages = snapshot.data!.docs;
+
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_scrollController.hasClients) {
+                      _scrollController.animateTo(
+                        _scrollController.position.maxScrollExtent,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    }
+                  });
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message =
+                          messages[index].data() as Map<String, dynamic>;
+                      final isMe = message['senderId'] ==
+                          FirebaseAuth.instance.currentUser?.uid;
+                      return _buildMessageBubble(message, isMe);
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Input
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _messageController,
+                    decoration: InputDecoration(
+                      hintText: 'Type a message...',
+                      hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 14),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                    ),
+                    style: GoogleFonts.poppins(fontSize: 14),
+                    textCapitalization: TextCapitalization.sentences,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: _sendMessage,
+                    icon: const Icon(Icons.send, color: Colors.white, size: 18),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -576,21 +977,22 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
     final text = message['text'] ?? '';
     final senderName = message['senderName'] ?? 'Unknown';
     final senderRole = message['senderRole'] ?? '';
-    
+
     String timeStr = '';
     if (message['createdAt'] != null) {
       try {
         final date = (message['createdAt'] as Timestamp).toDate();
-        timeStr = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+        timeStr =
+            '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
       } catch (_) {}
     }
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: 10),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.65,
+          maxWidth: MediaQuery.of(context).size.width * 0.55,
         ),
         child: Column(
           crossAxisAlignment:
@@ -598,41 +1000,41 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
           children: [
             if (!isMe)
               Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 4),
+                padding: const EdgeInsets.only(left: 4, bottom: 2),
                 child: Text(
                   '$senderName ${senderRole.isNotEmpty ? '($senderRole)' : ''}',
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: 10,
                     color: Colors.grey[600],
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: isMe ? AppColors.primary : Colors.grey.shade100,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isMe ? 16 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 16),
+                  topLeft: const Radius.circular(14),
+                  topRight: const Radius.circular(14),
+                  bottomLeft: Radius.circular(isMe ? 14 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 14),
                 ),
               ),
               child: Text(
                 text,
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 13,
                   color: isMe ? Colors.white : Colors.black87,
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
+              padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
               child: Text(
                 timeStr,
                 style: GoogleFonts.poppins(
-                  fontSize: 10,
+                  fontSize: 9,
                   color: Colors.grey,
                 ),
               ),
@@ -643,64 +1045,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
     );
   }
 
-  Widget _buildMessageInput(String bookingId) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 12,
-        bottom: MediaQuery.of(context).padding.bottom + 12,
-      ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: InputDecoration(
-                hintText: 'Type a message...',
-                hintStyle: GoogleFonts.poppins(color: Colors.grey),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              style: GoogleFonts.poppins(fontSize: 14),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              onPressed: () => _sendMessage(bookingId),
-              icon: const Icon(Icons.send, color: Colors.white, size: 20),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _sendMessage(String bookingId) async {
+  Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
@@ -711,13 +1056,13 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
 
     try {
       // Get user data for name
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final userDoc = await widget.firestore.collection('users').doc(user.uid).get();
       final userData = userDoc.data() ?? {};
       final userName = userData['fullName'] ?? userData['name'] ?? 'Customer';
 
-      await _firestore
+      await widget.firestore
           .collection('bookings')
-          .doc(bookingId)
+          .doc(widget.bookingId)
           .collection('messages')
           .add({
         'text': text,
