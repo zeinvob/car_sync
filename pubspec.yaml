@@ -51,6 +51,10 @@ dependencies:
   firebase_messaging: ^16.1.2
   intl: ^0.20.2
   flutter_slidable: ^4.0.3
+  file_picker: 8.1.2
+  firebase_storage: ^13.1.0
+  map_launcher: ^3.5.0
+  google_maps_flutter: ^2.13.1
 
 dev_dependencies:
   flutter_test:
