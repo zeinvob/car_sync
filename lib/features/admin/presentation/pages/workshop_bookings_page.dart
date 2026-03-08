@@ -32,7 +32,7 @@ class WorkshopBookingsPage extends StatefulWidget {
   @override
   State<WorkshopBookingsPage> createState() => _WorkshopBookingsPageState();
 }
-
+//
 class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
   final WorkshopService _workshopService = WorkshopService();
   final ChatService _chatService = ChatService();
