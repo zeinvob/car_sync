@@ -118,6 +118,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     return PopScope(
       canPop: _selectedIndex == 0,
+      // ignore: deprecated_member_use
       onPopInvoked: (didPop) {
         if (didPop) return;
 
@@ -776,6 +777,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               return _buildWorkshopCard(
                 title: item['name'] ?? 'Workshop',
                 subtitle: item['address'] ?? 'No address',
+                imageUrl: (item['imageUrl'] ?? '').toString(),
                 bookingCount: item['bookingCount'] ?? 0,
                 onTap: () {
                   Navigator.push(
@@ -913,6 +915,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Widget _buildWorkshopCard({
     required String title,
     required String subtitle,
+    required String imageUrl,
     required int bookingCount,
     required VoidCallback onTap,
   }) {
@@ -933,25 +936,55 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            height: 110,
-            width: double.infinity,
-            decoration: BoxDecoration(
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: Container(
+              height: 110,
+              width: double.infinity,
               color: onSurface.withOpacity(0.06),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-            ),
-            child: const Icon(
-              Icons.garage_outlined,
-              size: 46,
-              color: AppColors.primary,
+              child: imageUrl.trim().isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: 110,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(
+                            Icons.garage_outlined,
+                            size: 46,
+                            color: AppColors.primary,
+                          ),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      },
+                    )
+                  : const Center(
+                      child: Icon(
+                        Icons.garage_outlined,
+                        size: 46,
+                        color: AppColors.primary,
+                      ),
+                    ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
@@ -965,41 +998,51 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-  subtitle,
-  maxLines: 1,
-  overflow: TextOverflow.ellipsis,
-  textAlign: TextAlign.center,
-  style: GoogleFonts.poppins(
-    fontSize: 11,
-    color: onSurface.withOpacity(0.7),
-  ),
-),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.left,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: onSurface.withOpacity(0.7),
                   ),
-                  decoration: BoxDecoration(
-                    color: onSurface.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    "$bookingCount bookings",
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: onSurface,
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(08),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE67E22).withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: const Color(0xFFFFCC80),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      "$bookingCount bookings",
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFFE67E22),
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 10),
           Container(
             width: double.infinity,
-            margin: const EdgeInsets.all(10),
+            margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
             child: GradientButton(
               text: "Open",
               height: 45,
