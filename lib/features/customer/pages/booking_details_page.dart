@@ -72,13 +72,12 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(
-            onPressed: () => _showChatDialog(context, bookingId),
-            icon: const Icon(Icons.chat_bubble_outline),
-            tooltip: 'Chat with Admin',
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showChatDialog(context, bookingId),
+        backgroundColor: AppColors.primary,
+        elevation: 4,
+        child: const Icon(Icons.chat_bubble, color: Colors.white),
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: _firestore.collection('bookings').doc(bookingId).snapshots(),
