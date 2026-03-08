@@ -118,6 +118,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     return PopScope(
       canPop: _selectedIndex == 0,
+      // ignore: deprecated_member_use
       onPopInvoked: (didPop) {
         if (didPop) return;
 
