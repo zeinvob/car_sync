@@ -43,6 +43,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     if (s == 'in_progress') return Colors.blue;
     if (s == 'completed') return Colors.green;
     if (s == 'pending') return Colors.red;
+    if (s == 'cancelled') return Colors.grey;
     return Colors.grey;
   }
 
@@ -66,7 +67,13 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
   }
 
   Future<void> _changeStatus(String bookingId, String currentStatus) async {
-    final statuses = ['requested', 'confirmed', 'in_progress', 'completed'];
+    final statuses = [
+      'requested',
+      'confirmed',
+      'in_progress',
+      'completed',
+      'cancelled',
+    ];
     String selected = currentStatus;
 
     final result = await showDialog<String>(
@@ -146,7 +153,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     if (_filter == 'Active') {
       result = result.where((b) {
         final s = (b['status'] ?? '').toString().toLowerCase();
-        return s != 'completed';
+        return s != 'completed' && s != 'cancelled';
       }).toList();
     } else if (_filter == 'Completed') {
       result = result.where((b) {
@@ -167,15 +174,20 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     // Sort by bookingDate: upcoming first; past goes down.
     final now = DateTime.now();
     result.sort((a, b) {
-      final aDt = _timestampToDate(a['bookingDate']) ?? DateTime(1970);
-      final bDt = _timestampToDate(b['bookingDate']) ?? DateTime(1970);
+      final aCreated = _timestampToDate(a['createdAt']) ?? DateTime(1970);
+      final bCreated = _timestampToDate(b['createdAt']) ?? DateTime(1970);
 
-      final aIsPast = aDt.isBefore(now);
-      final bIsPast = bDt.isBefore(now);
+      final aBookingDate = _timestampToDate(a['bookingDate']) ?? DateTime(1970);
+      final bBookingDate = _timestampToDate(b['bookingDate']) ?? DateTime(1970);
 
+      final aIsPast = aBookingDate.isBefore(now);
+      final bIsPast = bBookingDate.isBefore(now);
+
+      // Keep upcoming above past if Show Past is on
       if (aIsPast != bIsPast) return aIsPast ? 1 : -1;
-      if (!aIsPast && !bIsPast) return aDt.compareTo(bDt);
-      return bDt.compareTo(aDt);
+
+      // Inside each group, latest created booking first
+      return bCreated.compareTo(aCreated);
     });
 
     if (widget.highlightBookingId != null &&
@@ -509,7 +521,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "Vehicle ID: ${(booking['vehicleId'] ?? '').toString().isEmpty ? '-' : booking['vehicleId']}",
+                                    "Vehicle: ${(booking['vehicleDisplay'] ?? '').toString().isEmpty ? '-' : booking['vehicleDisplay']}",
                                     style: GoogleFonts.poppins(
                                       fontSize: 12,
                                       color: onSurface.withOpacity(0.75),
@@ -525,7 +537,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "Booked Slot: ${_formatTimestamp(booking['slotTime'])}",
+                                    "Booked Slot: ${_formatTimestamp(booking['bookingDate'])}",
                                     style: GoogleFonts.poppins(
                                       fontSize: 12,
                                       color: onSurface.withOpacity(0.75),
@@ -533,7 +545,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "Booked Time Only: ${_formatTimeOnly(booking['slotTime'])}",
+                                    "Booked Time Only: ${_formatTimeOnly(booking['bookingDate'])}",
                                     style: GoogleFonts.poppins(
                                       fontSize: 12,
                                       color: onSurface.withOpacity(0.75),

@@ -35,15 +35,15 @@ class BookingService {
       for (final doc in snapshot.docs) {
         final data = doc.data();
         final status = (data['status'] ?? '').toString().toLowerCase();
-        
+
         // Skip cancelled bookings
         if (status == 'cancelled') continue;
-        
+
         final bookingTimestamp = data['bookingDate'];
         if (bookingTimestamp == null) continue;
-        
+
         final existingDate = (bookingTimestamp as Timestamp).toDate();
-        
+
         // Check if same day
         if (existingDate.year == date.year &&
             existingDate.month == date.month &&
@@ -57,8 +57,10 @@ class BookingService {
           .where((slot) => !bookedHours.contains(slot.hour))
           .toList();
 
-      print('Available slots for $workshopId on ${date.toString()}: ${availableSlots.length}');
-      
+      print(
+        'Available slots for $workshopId on ${date.toString()}: ${availableSlots.length}',
+      );
+
       return availableSlots;
     } catch (e) {
       print('getAvailableSlots error: $e');
@@ -93,21 +95,25 @@ class BookingService {
       final conflictingBookings = snapshot.docs.where((doc) {
         final data = doc.data();
         final status = (data['status'] ?? '').toString().toLowerCase();
-        
+
         // Skip cancelled bookings
         if (status == 'cancelled') return false;
-        
+
         // Check if booking is in the same time slot
         final bookingTimestamp = data['bookingDate'];
         if (bookingTimestamp == null) return false;
-        
+
         final existingDate = (bookingTimestamp as Timestamp).toDate();
-        return existingDate.isAfter(slotStart.subtract(const Duration(seconds: 1))) &&
-               existingDate.isBefore(slotEnd);
+        return existingDate.isAfter(
+              slotStart.subtract(const Duration(seconds: 1)),
+            ) &&
+            existingDate.isBefore(slotEnd);
       }).toList();
 
-      print('Slot check: workshopId=$workshopId, slot=${slotStart.toString()}, conflicts=${conflictingBookings.length}');
-      
+      print(
+        'Slot check: workshopId=$workshopId, slot=${slotStart.toString()}, conflicts=${conflictingBookings.length}',
+      );
+
       return conflictingBookings.isEmpty;
     } catch (e) {
       print('isSlotAvailable error: $e');
@@ -156,10 +162,12 @@ class BookingService {
   }
 
   /// Gets all bookings for a customer
-  Future<List<Map<String, dynamic>>> getCustomerBookings(String customerId) async {
+  Future<List<Map<String, dynamic>>> getCustomerBookings(
+    String customerId,
+  ) async {
     try {
       print('Fetching bookings for customer: $customerId');
-      
+
       final snapshot = await _firestore
           .collection('bookings')
           .where('customerId', isEqualTo: customerId)
@@ -174,12 +182,15 @@ class BookingService {
         print('Booking data: $data');
         final workshopId = (data['workshopId'] ?? '').toString();
         final vehicleId = (data['vehicleId'] ?? '').toString();
-        
+
         // Get workshop details
         Map<String, dynamic> workshopData = {};
         if (workshopId.isNotEmpty) {
           try {
-            final workshopDoc = await _firestore.collection('workshops').doc(workshopId).get();
+            final workshopDoc = await _firestore
+                .collection('workshops')
+                .doc(workshopId)
+                .get();
             if (workshopDoc.exists) {
               workshopData = workshopDoc.data() ?? {};
             }
@@ -192,7 +203,10 @@ class BookingService {
         Map<String, dynamic> vehicleData = {};
         if (vehicleId.isNotEmpty) {
           try {
-            final vehicleDoc = await _firestore.collection('vehicles').doc(vehicleId).get();
+            final vehicleDoc = await _firestore
+                .collection('vehicles')
+                .doc(vehicleId)
+                .get();
             if (vehicleDoc.exists) {
               vehicleData = vehicleDoc.data() ?? {};
             }
@@ -206,7 +220,8 @@ class BookingService {
         if (vehicleData.isNotEmpty) {
           final brand = vehicleData['brand'] ?? '';
           final model = vehicleData['model'] ?? '';
-          final plateNo = vehicleData['plateNumber'] ?? vehicleData['plateNo'] ?? '';
+          final plateNo =
+              vehicleData['plateNumber'] ?? vehicleData['plateNo'] ?? '';
           vehicleDisplay = '$brand $model • $plateNo';
         }
 
@@ -245,7 +260,9 @@ class BookingService {
   }
 
   /// Get bookings by workshop
-  Future<List<Map<String, dynamic>>> getBookingsByWorkshop(String workshopId) async {
+  Future<List<Map<String, dynamic>>> getBookingsByWorkshop(
+    String workshopId,
+  ) async {
     try {
       final snapshot = await _firestore
           .collection('bookings')
@@ -262,7 +279,10 @@ class BookingService {
 
         if (customerId.isNotEmpty) {
           try {
-            final userDoc = await _firestore.collection('users').doc(customerId).get();
+            final userDoc = await _firestore
+                .collection('users')
+                .doc(customerId)
+                .get();
             if (userDoc.exists) {
               customerData = userDoc.data() ?? {};
             }
@@ -270,15 +290,50 @@ class BookingService {
             print('Error loading user for booking ${doc.id}: $e');
           }
         }
+        // PUT YOUR VEHICLE CODE HERE
+        final vehicleId = (data['vehicleId'] ?? '').toString();
+        Map<String, dynamic> vehicleData = {};
+
+        if (vehicleId.isNotEmpty) {
+          try {
+            final vehicleDoc = await _firestore
+                .collection('vehicles')
+                .doc(vehicleId)
+                .get();
+            if (vehicleDoc.exists) {
+              vehicleData = vehicleDoc.data() ?? {};
+            }
+          } catch (e) {
+            print('Error loading vehicle for booking ${doc.id}: $e');
+          }
+        }
+
+        final brand = (vehicleData['brand'] ?? '').toString();
+        final model = (vehicleData['model'] ?? '').toString();
+        final plateNumber =
+            (vehicleData['plateNumber'] ?? vehicleData['plateNo'] ?? '')
+                .toString();
+
+        final vehicleDisplay = [
+          brand,
+          model,
+        ].where((e) => e.isNotEmpty).join(' ');
+
+        final vehicleFullDisplay = [
+          if (vehicleDisplay.isNotEmpty) vehicleDisplay,
+          if (plateNumber.isNotEmpty) plateNumber,
+        ].join(' • ');
 
         bookingsWithCustomer.add({
           'id': doc.id,
           'customerId': customerId,
-          'customerName': customerData['name'] ??
+          'customerName':
+              customerData['name'] ??
               customerData['fullName'] ??
               customerData['username'] ??
               'Unknown Customer',
-          'customerPhone': customerData['phone'] ??
+          'customerPhone':
+              customerData['phone'] ??
               customerData['contact'] ??
               customerData['phoneNumber'] ??
               'No contact',
@@ -287,6 +342,12 @@ class BookingService {
           'status': data['status'] ?? '',
           'workshopId': data['workshopId'] ?? '',
           'bookingDate': data['bookingDate'],
+          'vehicleId': vehicleId,
+          'vehicleBrand': brand,
+          'vehicleModel': model,
+          'plateNumber': plateNumber,
+          'vehicleDisplay': vehicleFullDisplay,
+          'notes': data['notes'] ?? '',
           'createdAt': data['createdAt'],
           'updatedAt': data['updatedAt'],
         });
