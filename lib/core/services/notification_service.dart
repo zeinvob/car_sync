@@ -201,6 +201,10 @@ class NotificationService {
     required String newStatus,
     String? technicianName,
   }) async {
+    print('=== createBookingStatusNotificationForCustomer ===');
+    print('customerId: $customerId, bookingId: $bookingId');
+    print('workshopName: $workshopName, newStatus: $newStatus');
+    
     String title;
     String body;
 
@@ -230,6 +234,8 @@ class NotificationService {
             'Your booking status at $workshopName has been updated to $newStatus.';
     }
 
+    print('Creating notification - title: $title, body: $body');
+    
     await createNotification(
       targetUserId: customerId,
       type: 'booking_status_update',
@@ -243,6 +249,8 @@ class NotificationService {
         if (technicianName != null) 'technicianName': technicianName,
       },
     );
+    
+    print('Notification document created in Firestore');
   }
 
   /// Create a notification for customer when technician adds a repair update
