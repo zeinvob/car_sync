@@ -1,10 +1,12 @@
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
 import 'package:car_sync/features/customer/pages/add_vehicle_page.dart';
 import 'package:car_sync/features/customer/pages/book_service_page.dart';
 import 'package:car_sync/features/customer/pages/booking_details_page.dart';
+import 'package:car_sync/features/customer/pages/customer_notifications_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,6 +21,7 @@ class CustomerHomePage extends StatefulWidget {
 class _CustomerHomePageState extends State<CustomerHomePage> {
   final AuthService _authService = AuthService();
   final StorageService _storageService = StorageService();
+  final NotificationService _notificationService = NotificationService.instance;
 
   int _currentIndex = 0;
   bool _isLoading = true;
@@ -44,13 +47,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       if (user != null) {
         // Get user profile data
         final userData = await _storageService.getUserData(user.uid);
-        
+
         setState(() {
-          _userName = userData?['name'] ?? 
-                      userData?['fullName'] ?? 
-                      userData?['username'] ?? 
-                      user.displayName ?? 
-                      'Customer';
+          _userName =
+              userData?['name'] ??
+              userData?['fullName'] ??
+              userData?['username'] ??
+              user.displayName ??
+              'Customer';
           _userEmail = userData?['email'] ?? user.email ?? '';
         });
 
@@ -177,7 +181,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           ),
         ),
         const SizedBox(width: 16),
-        
+
         // Greeting
         Expanded(
           child: Column(
@@ -203,19 +207,59 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           ),
         ),
 
-        // Notification bell
-        IconButton(
-          onPressed: () {
-            // TODO: Navigate to notifications
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Notifications coming soon!')),
+        // Notification bell with badge
+        StreamBuilder<int>(
+          stream: _notificationService.unreadUserNotificationCountStream(
+            userId: FirebaseAuth.instance.currentUser?.uid ?? '',
+          ),
+          builder: (context, snapshot) {
+            final count = snapshot.data ?? 0;
+            return Stack(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CustomerNotificationsPage(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.notifications_outlined,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
+                ),
+                if (count > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Center(
+                        child: Text(
+                          count > 99 ? '99+' : count.toString(),
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
-          icon: const Icon(
-            Icons.notifications_outlined,
-            color: AppColors.primary,
-            size: 28,
-          ),
         ),
       ],
     );
@@ -295,7 +339,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 onTap: () {
                   // TODO: Navigate to spare parts page
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Browse Spare Parts coming soon!')),
+                    const SnackBar(
+                      content: Text('Browse Spare Parts coming soon!'),
+                    ),
                   );
                 },
               ),
@@ -390,10 +436,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             const SizedBox(height: 4),
             Text(
               'Book a service to get started',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: Colors.grey[500],
-              ),
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[500]),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -409,7 +452,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -452,7 +498,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -513,11 +562,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.history_outlined,
-            size: 48,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.history_outlined, size: 48, color: Colors.grey[400]),
           const SizedBox(height: 12),
           Text(
             'No Service History',
@@ -530,10 +575,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           const SizedBox(height: 4),
           Text(
             'Your completed services will appear here',
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              color: Colors.grey[500],
-            ),
+            style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -607,10 +649,13 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Widget _buildBookingCard(Map<String, dynamic> booking) {
-    final status = (booking['status'] ?? 'pending').toString().toLowerCase().trim();
+    final status = (booking['status'] ?? 'pending')
+        .toString()
+        .toLowerCase()
+        .trim();
     final serviceType = booking['serviceType'] ?? 'Service';
     final workshopName = booking['workshopName'] ?? 'Workshop';
-    
+
     // Parse booking date and time
     String dateStr = 'Pending';
     String timeStr = '';
@@ -619,13 +664,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         final timestamp = booking['bookingDate'] as dynamic;
         final date = timestamp.toDate();
         dateStr = '${date.day}/${date.month}/${date.year}';
-        timeStr = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+        timeStr =
+            '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
       } catch (_) {}
     }
 
     Color statusColor;
     String statusLabel;
-    
+
     switch (status) {
       case 'requested':
         statusColor = const Color.fromARGB(255, 251, 139, 176);
@@ -652,7 +698,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         // Convert snake_case to Title Case (e.g., "in_progress" -> "In Progress")
         statusLabel = status
             .split('_')
-            .map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '')
+            .map(
+              (word) => word.isNotEmpty
+                  ? word[0].toUpperCase() + word.substring(1)
+                  : '',
+            )
             .join(' ');
     }
 
@@ -690,7 +740,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -712,16 +765,20 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Icon(Icons.business, size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    workshopName,
+                    workshopName.toString().trim(),
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       color: Colors.grey[700],
+                      height: 1.2,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -791,34 +848,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ],
               ),
             ],
-            // Cancel button - only show for requested/confirmed (before in_progress)
-            if (status == 'requested' || status == 'confirmed') ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showCancelBookingDialog(booking),
-                  icon: const Icon(Icons.cancel_outlined, size: 18),
-                  label: Text(
-                    'Cancel Booking',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            // View Details button - show for in_progress, completed, and any other status except requested/confirmed/cancelled
-            if (status != 'requested' && status != 'confirmed' && status != 'cancelled') ...[
+            // View Details button - show for all statuses except cancelled
+            if (status != 'cancelled') ...[
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -858,84 +889,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     ).then((_) => _loadUserData()); // Refresh on return
   }
 
-  void _showCancelBookingDialog(Map<String, dynamic> booking) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Cancel Booking',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: Text(
-          'Are you sure you want to cancel this booking? This action cannot be changed.',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'No, Keep It',
-              style: GoogleFonts.poppins(color: Colors.grey[600]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _cancelBooking(booking);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2F4F6F),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              'Yes, Cancel',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _cancelBooking(Map<String, dynamic> booking) async {
-    try {
-      final bookingId = booking['id'];
-      if (bookingId == null) return;
-
-      await _storageService.updateBookingStatus(
-        bookingId: bookingId,
-        newStatus: 'cancelled',
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Booking cancelled successfully',
-            style: GoogleFonts.poppins(),
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      // Refresh bookings list
-      await _loadUserData();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to cancel booking: $e',
-            style: GoogleFonts.poppins(),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   /// ============ VEHICLES TAB ============
   Widget _buildVehiclesPage() {
     return SafeArea(
@@ -957,7 +910,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
                 IconButton(
                   onPressed: () => _navigateToAddVehicle(),
-                  icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+                  icon: const Icon(
+                    Icons.add_circle_outline,
+                    color: AppColors.primary,
+                  ),
                 ),
               ],
             ),
@@ -1003,10 +959,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           const SizedBox(height: 8),
           Text(
             'Add your vehicle to book services',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
@@ -1121,7 +1074,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         children: [
                           const Icon(Icons.delete, size: 18, color: Colors.red),
                           const SizedBox(width: 8),
-                          Text('Delete', style: GoogleFonts.poppins(color: Colors.red)),
+                          Text(
+                            'Delete',
+                            style: GoogleFonts.poppins(color: Colors.red),
+                          ),
                         ],
                       ),
                     ),
@@ -1136,8 +1092,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               children: [
                 if (year.isNotEmpty) _buildInfoChip(Icons.calendar_today, year),
                 if (color.isNotEmpty) _buildInfoChip(Icons.palette, color),
-                if (transmission.isNotEmpty) _buildInfoChip(Icons.settings, transmission),
-                if (fuelType.isNotEmpty) _buildInfoChip(Icons.local_gas_station, fuelType),
+                if (transmission.isNotEmpty)
+                  _buildInfoChip(Icons.settings, transmission),
+                if (fuelType.isNotEmpty)
+                  _buildInfoChip(Icons.local_gas_station, fuelType),
               ],
             ),
           ],
@@ -1160,10 +1118,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           const SizedBox(width: 4),
           Text(
             label,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.grey[700],
-            ),
+            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[700]),
           ),
         ],
       ),
@@ -1183,7 +1138,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   Future<void> _navigateToEditVehicle(Map<String, dynamic> vehicle) async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => AddVehiclePage(existingVehicle: vehicle)),
+      MaterialPageRoute(
+        builder: (_) => AddVehiclePage(existingVehicle: vehicle),
+      ),
     );
     if (result == true) {
       _loadUserData();
@@ -1194,7 +1151,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete Vehicle', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        title: Text(
+          'Delete Vehicle',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
         content: Text(
           'Are you sure you want to delete ${vehicle['brand']} ${vehicle['model']}?',
           style: GoogleFonts.poppins(),
@@ -1206,7 +1166,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red)),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.poppins(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -1227,10 +1190,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -1245,7 +1205,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            
+
             // Profile Avatar
             Container(
               width: 100,
@@ -1270,7 +1230,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Name
             Text(
               _userName,
@@ -1282,10 +1242,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             Text(
               _userEmail,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 32),
 
@@ -1385,18 +1342,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         leading: Icon(icon, color: AppColors.primary),
         title: Text(
           title,
-          style: GoogleFonts.poppins(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-          ),
+          style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500),
         ),
-        trailing: Icon(
-          Icons.chevron_right,
-          color: Colors.grey[400],
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        trailing: Icon(Icons.chevron_right, color: Colors.grey[400]),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -1421,8 +1370,18 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(0, Icons.home_outlined, Icons.home, 'Home'),
-              _buildNavItem(1, Icons.calendar_month_outlined, Icons.calendar_month, 'Bookings'),
-              _buildNavItem(2, Icons.directions_car_outlined, Icons.directions_car, 'Vehicles'),
+              _buildNavItem(
+                1,
+                Icons.calendar_month_outlined,
+                Icons.calendar_month,
+                'Bookings',
+              ),
+              _buildNavItem(
+                2,
+                Icons.directions_car_outlined,
+                Icons.directions_car,
+                'Vehicles',
+              ),
               _buildNavItem(3, Icons.person_outline, Icons.person, 'Profile'),
             ],
           ),
@@ -1431,7 +1390,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, IconData activeIcon, String label) {
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    IconData activeIcon,
+    String label,
+  ) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
@@ -1440,7 +1404,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+          color: isSelected
+              ? AppColors.primary.withOpacity(0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(

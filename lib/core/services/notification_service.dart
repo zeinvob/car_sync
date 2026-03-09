@@ -37,8 +37,9 @@ class NotificationService {
       debugPrint('Foreground notification received: ${message.messageId}');
     });
 
-    _openedAppSubscription =
-        FirebaseMessaging.onMessageOpenedApp.listen((message) {
+    _openedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
+      message,
+    ) {
       debugPrint('Notification opened app: ${message.messageId}');
     });
   }
@@ -114,6 +115,23 @@ class NotificationService {
     required String role,
   }) {
     return _storageService.getNotificationsByRoleStream(role);
+  }
+
+  /// Get notifications stream for a specific user (customer)
+  Stream<List<Map<String, dynamic>>> userNotificationsStream({
+    required String userId,
+  }) {
+    return _storageService.getNotificationsByUserIdStream(userId);
+  }
+
+  /// Get unread notification count for a specific user (customer)
+  Stream<int> unreadUserNotificationCountStream({required String userId}) {
+    return _storageService.getUnreadNotificationCountByUserId(userId);
+  }
+
+  /// Mark all user-specific notifications as read
+  Future<void> markAllUserNotificationsAsRead({required String userId}) async {
+    await _storageService.markAllUserNotificationsAsRead(userId: userId);
   }
 
   Future<void> markNotificationAsReadForUser({

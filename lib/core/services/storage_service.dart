@@ -332,10 +332,11 @@ class StorageService {
   }
 
   Future<void> createNotification({
-    required String targetRole,
     required String type,
     required String title,
     required String body,
+    String? targetRole,
+    String? targetUserId,
     String? relatedBookingId,
     String? relatedWorkshopId,
     Map<String, dynamic>? extraData,
@@ -343,6 +344,7 @@ class StorageService {
     try {
       await _notificationsCollection.add({
         'targetRole': targetRole,
+        'targetUserId': targetUserId,
         'type': type,
         'title': title,
         'body': body,
@@ -394,6 +396,115 @@ class StorageService {
       relatedWorkshopId: workshopId,
       extraData: {'bookingId': bookingId, 'workshopId': workshopId},
     );
+  }
+
+  /// Create a notification for customer when booking status changes
+  Future<void> createBookingStatusNotificationForCustomer({
+    required String customerId,
+    required String bookingId,
+    required String workshopName,
+    required String newStatus,
+    String? technicianName,
+  }) async {
+    String title;
+    String body;
+
+    switch (newStatus.toLowerCase()) {
+      case 'confirmed':
+        title = 'Booking Confirmed';
+        body =
+            'Your booking at $workshopName has been confirmed. Please arrive on your scheduled date.';
+        break;
+      case 'in_progress':
+        title = 'Service In Progress';
+        body =
+            'Your vehicle is now being serviced at $workshopName.${technicianName != null ? ' Technician: $technicianName' : ''}';
+        break;
+      case 'completed':
+        title = 'Service Completed';
+        body =
+            'Your vehicle service at $workshopName has been completed. Thank you for choosing us!';
+        break;
+      case 'cancelled':
+        title = 'Booking Cancelled';
+        body = 'Your booking at $workshopName has been cancelled.';
+        break;
+      default:
+        title = 'Booking Update';
+        body =
+            'Your booking status at $workshopName has been updated to $newStatus.';
+    }
+
+    await createNotification(
+      targetUserId: customerId,
+      type: 'booking_status_update',
+      title: title,
+      body: body,
+      relatedBookingId: bookingId,
+      extraData: {
+        'bookingId': bookingId,
+        'workshopName': workshopName,
+        'newStatus': newStatus,
+        if (technicianName != null) 'technicianName': technicianName,
+      },
+    );
+  }
+
+  /// Create a notification for customer when technician adds a repair update
+  Future<void> createRepairUpdateNotificationForCustomer({
+    required String customerId,
+    required String bookingId,
+    required String workshopName,
+    required String updateType,
+    required String updateTitle,
+  }) async {
+    await createNotification(
+      targetUserId: customerId,
+      type: 'repair_update',
+      title: 'Repair Update',
+      body: '$updateTitle - $workshopName',
+      relatedBookingId: bookingId,
+      extraData: {
+        'bookingId': bookingId,
+        'workshopName': workshopName,
+        'updateType': updateType,
+        'updateTitle': updateTitle,
+      },
+    );
+  }
+
+  /// Get notifications stream for a specific customer
+  Stream<List<Map<String, dynamic>>> getNotificationsByUserIdStream(
+    String userId,
+  ) {
+    return _notificationsCollection
+        .where('targetUserId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return {'id': doc.id, ...data};
+          }).toList();
+        });
+  }
+
+  /// Get unread notification count for a specific customer
+  Stream<int> getUnreadNotificationCountByUserId(String userId) {
+    return _notificationsCollection
+        .where('targetUserId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          int count = 0;
+          for (final doc in snapshot.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final List<dynamic> isReadBy = data['isReadBy'] ?? [];
+            if (!isReadBy.contains(userId)) {
+              count++;
+            }
+          }
+          return count;
+        });
   }
 
   Stream<List<Map<String, dynamic>>> getNotificationsByRoleStream(String role) {
@@ -489,6 +600,27 @@ class StorageService {
       await batch.commit();
     } catch (e) {
       debugPrint('Error marking role notifications as read: $e');
+    }
+  }
+
+  /// Mark all user-specific notifications as read
+  Future<void> markAllUserNotificationsAsRead({required String userId}) async {
+    try {
+      final snapshot = await _notificationsCollection
+          .where('targetUserId', isEqualTo: userId)
+          .get();
+
+      final batch = _firestore.batch();
+
+      for (final doc in snapshot.docs) {
+        batch.update(doc.reference, {
+          'isReadBy': FieldValue.arrayUnion([userId]),
+        });
+      }
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Error marking user notifications as read: $e');
     }
   }
 }
