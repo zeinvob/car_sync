@@ -1,6 +1,9 @@
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/auth_service.dart';
-import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/core/services/workshop_service.dart';
+import 'package:car_sync/core/services/booking_service.dart';
+import 'package:car_sync/core/services/vehicle_service.dart';
+import 'package:car_sync/core/services/review_service.dart';
 import 'package:car_sync/features/customer/pages/workshop_map_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +19,8 @@ class BookServicePage extends StatefulWidget {
 }
 
 class _BookServicePageState extends State<BookServicePage> {
-  final StorageService _storageService = StorageService();
+  final WorkshopService _workshopService = WorkshopService();
+  final ReviewService _reviewService = ReviewService();
   final TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> _workshops = [];
@@ -67,7 +71,7 @@ class _BookServicePageState extends State<BookServicePage> {
     setState(() => _isLoading = true);
 
     try {
-      final workshops = await _storageService.getWorkshopList(
+      final workshops = await _workshopService.getWorkshopList(
         userLat: _currentPosition?.latitude,
         userLon: _currentPosition?.longitude,
       );
@@ -658,7 +662,7 @@ class _BookServicePageState extends State<BookServicePage> {
     final workshopId = workshop['id'] ?? '';
     
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _storageService.getWorkshopReviews(workshopId),
+      future: _reviewService.getWorkshopReviews(workshopId),
       builder: (context, snapshot) {
         final reviews = snapshot.data ?? [];
         
@@ -786,7 +790,7 @@ class _BookServicePageState extends State<BookServicePage> {
     if (user == null) return const SizedBox.shrink();
     
     return FutureBuilder<bool>(
-      future: _storageService.canUserReview(
+      future: _reviewService.canUserReview(
         workshopId: workshopId,
         userId: user.uid,
       ),
@@ -940,7 +944,7 @@ class _BookServicePageState extends State<BookServicePage> {
                       if (user == null) return;
                       
                       try {
-                        await _storageService.addReview(
+                        await _reviewService.addReview(
                           workshopId: workshop['id'] ?? '',
                           userId: user.uid,
                           userName: user.displayName ?? 'Customer',
@@ -1131,11 +1135,11 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
   Future<void> _loadVehicles() async {
     try {
       final authService = AuthService();
-      final storageService = StorageService();
+      final vehicleService = VehicleService();
       final currentUser = authService.currentUser;
 
       if (currentUser != null) {
-        final vehicles = await storageService.getCustomerVehicles(currentUser.uid);
+        final vehicles = await vehicleService.getCustomerVehicles(currentUser.uid);
         if (mounted) {
           setState(() {
             _vehicles = vehicles;
@@ -1162,10 +1166,10 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
     });
 
     try {
-      final storageService = StorageService();
+      final bookingService = BookingService();
       final workshopId = widget.workshop['id'] ?? '';
       
-      final slots = await storageService.getAvailableSlots(
+      final slots = await bookingService.getAvailableSlots(
         workshopId: workshopId,
         date: _selectedDate,
       );
@@ -1247,7 +1251,7 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
 
     try {
       final authService = AuthService();
-      final storageService = StorageService();
+      final bookingService = BookingService();
       final currentUser = authService.currentUser;
 
       if (currentUser == null) {
@@ -1264,7 +1268,7 @@ class _BookingFormSheetState extends State<_BookingFormSheet> {
       );
 
       // Save booking to Firestore with selected vehicle
-      await storageService.createBooking(
+      await bookingService.createBooking(
         customerId: currentUser.uid,
         workshopId: widget.workshop['id'] ?? '',
         serviceType: _selectedService,

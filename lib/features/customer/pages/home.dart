@@ -1,5 +1,7 @@
 import 'package:car_sync/core/services/auth_service.dart';
-import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/core/services/user_service.dart';
+import 'package:car_sync/core/services/booking_service.dart';
+import 'package:car_sync/core/services/vehicle_service.dart';
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
@@ -20,7 +22,9 @@ class CustomerHomePage extends StatefulWidget {
 
 class _CustomerHomePageState extends State<CustomerHomePage> {
   final AuthService _authService = AuthService();
-  final StorageService _storageService = StorageService();
+  final UserService _userService = UserService();
+  final BookingService _bookingService = BookingService();
+  final VehicleService _vehicleService = VehicleService();
   final NotificationService _notificationService = NotificationService.instance;
 
   int _currentIndex = 0;
@@ -46,7 +50,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         // Get user profile data
-        final userData = await _storageService.getUserData(user.uid);
+        final userData = await _userService.getUserData(user.uid);
 
         setState(() {
           _userName =
@@ -59,8 +63,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         });
 
         // Load active bookings for this customer
-        final bookings = await _storageService.getCustomerBookings(user.uid);
-        final vehicles = await _storageService.getCustomerVehicles(user.uid);
+        final bookings = await _bookingService.getCustomerBookings(user.uid);
+        final vehicles = await _vehicleService.getCustomerVehicles(user.uid);
         if (mounted) {
           setState(() {
             _activeBookings = bookings;
@@ -1177,7 +1181,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
     if (confirmed == true) {
       try {
-        await _storageService.deleteVehicle(vehicle['id']);
+        await _vehicleService.deleteVehicle(vehicle['id']);
         _loadUserData();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:car_sync/core/services/storage_service.dart';
-import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/core/services/user_service.dart';
+import 'package:car_sync/core/services/admin_service.dart';
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/services/auth_nav_flag.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -9,7 +9,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   late final GoogleSignIn _googleSignIn;
-  final StorageService _storageService = StorageService();
+  final UserService _userService = UserService();
+  final AdminService _adminService = AdminService();
 
   // Constructor with client ID
   AuthService({String? clientId}) {
@@ -67,11 +68,11 @@ class AuthService {
             userCredential.additionalUserInfo?.isNewUser ?? false;
 
         // Check if user exists in Firestore
-        bool userExists = await _storageService.userExists(user.uid);
+        bool userExists = await _userService.userExists(user.uid);
 
         if (isNewUser || !userExists) {
           // New Google user - save minimal data (no phone/dob)
-          await _storageService.saveGoogleUserData(
+          await _userService.saveGoogleUserData(
             uid: user.uid,
             email: user.email ?? '',
             fullName: user.displayName ?? 'Google User',
@@ -87,7 +88,7 @@ class AuthService {
           };
         } else {
           // Existing user - check if they have phone and dob
-          bool needsCompletion = await _storageService.needsProfileCompletion(
+          bool needsCompletion = await _userService.needsProfileCompletion(
             user.uid,
           );
 
@@ -178,7 +179,7 @@ class AuthService {
       User? user = _auth.currentUser;
       if (user == null) throw Exception('No user logged in');
 
-      await _storageService.completeUserProfile(
+      await _userService.completeUserProfile(
         uid: user.uid,
         phone: phone,
         dateOfBirth: dateOfBirth,
@@ -221,7 +222,7 @@ class AuthService {
 
         // Update Firestore if verification status changed
         if (isVerified && user != null) {
-          await _storageService.updateEmailVerified(user.uid, true);
+          await _userService.updateEmailVerified(user.uid, true);
         }
 
         print("Email verified: $isVerified");
@@ -261,7 +262,7 @@ class AuthService {
 
         // Save user data to Firestore
         try {
-          await _storageService.saveUserData(
+          await _userService.saveUserData(
             uid: user.uid,
             email: email,
             fullName: fullName,
@@ -385,7 +386,7 @@ class AuthService {
 
         // Save user data with CUSTOMER role
         try {
-          await _storageService.saveCustomerData(
+          await _userService.saveCustomerData(
             uid: user.uid,
             email: email,
             fullName: fullName,
@@ -420,7 +421,7 @@ class AuthService {
     try {
       User? user = _auth.currentUser;
       if (user != null) {
-        Map<String, dynamic>? userData = await _storageService.getUserData(
+        Map<String, dynamic>? userData = await _userService.getUserData(
           user.uid,
         );
         return userData?['role'] as String?;
@@ -477,7 +478,7 @@ class AuthService {
         await user.updateDisplayName(fullName);
 
         // Save foreman data with role
-        await _storageService.createForemanAccount(
+        await _adminService.createForemanAccount(
           uid: user.uid,
           email: email,
           fullName: fullName,
@@ -503,7 +504,7 @@ class AuthService {
       if (!await isCurrentUserAdmin()) {
         throw Exception('Only admins can view foremen');
       }
-      return await _storageService.getAllForemen();
+      return await _adminService.getAllForemen();
     } catch (e) {
       print("Error getting foremen: $e");
       return [];
@@ -519,7 +520,7 @@ class AuthService {
       if (!await isCurrentUserAdmin()) {
         throw Exception('Only admins can update foreman assignments');
       }
-      await _storageService.updateForemanSites(
+      await _adminService.updateForemanSites(
         uid: foremanUid,
         assignedSites: assignedSites,
       );

@@ -1,11 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' show sin, cos, sqrt, atan2, pi;
-import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/core/services/notification_service.dart';
 
 /// Service for workshop-related Firestore operations
 class WorkshopService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final StorageService _storageService = StorageService();
 
   /// Calculate distance between two coordinates using Haversine formula
   /// Returns distance in kilometers
@@ -230,7 +229,7 @@ class WorkshopService {
       }
 
       if (customerId.isNotEmpty) {
-        await _storageService.createBookingStatusNotificationForCustomer(
+        await NotificationService.instance.createBookingStatusNotificationForCustomer(
           customerId: customerId,
           bookingId: bookingId,
           workshopName: workshopName,

@@ -1,6 +1,6 @@
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/auth_service.dart';
-import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/core/services/vehicle_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -15,7 +15,7 @@ class AddVehiclePage extends StatefulWidget {
 
 class _AddVehiclePageState extends State<AddVehiclePage> {
   final _formKey = GlobalKey<FormState>();
-  final _storageService = StorageService();
+  final _vehicleService = VehicleService();
   final _authService = AuthService();
 
   // Controllers
@@ -86,7 +86,7 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
 
       if (_isEditMode) {
         // Update existing vehicle
-        await _storageService.updateVehicle(
+        await _vehicleService.updateVehicle(
           vehicleId: widget.existingVehicle!['id'],
           data: {
             'brand': _brandController.text.trim(),
@@ -101,7 +101,7 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
         );
       } else {
         // Add new vehicle
-        await _storageService.addVehicle(
+        await _vehicleService.addVehicle(
           customerId: currentUser.uid,
           brand: _brandController.text.trim(),
           model: _modelController.text.trim(),
