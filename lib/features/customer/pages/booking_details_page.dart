@@ -3,11 +3,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
+import 'package:car_sync/core/services/chat_service.dart';
+import 'package:car_sync/core/services/image_picker_service.dart';
+import 'package:car_sync/core/services/file_upload_service.dart';
 
 class BookingDetailsPage extends StatefulWidget {
   final Map<String, dynamic> booking;
+  final bool fromHistory;
 
-  const BookingDetailsPage({super.key, required this.booking});
+  const BookingDetailsPage({
+    super.key,
+    required this.booking,
+    this.fromHistory = false,
+  });
 
   @override
   State<BookingDetailsPage> createState() => _BookingDetailsPageState();
@@ -24,25 +32,29 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       'status': 'requested',
       'label': 'Requested',
       'icon': Icons.pending_actions,
-      'description': 'Your booking request has been submitted. Waiting for admin to review. This process usually takes 1-2 hours.',
+      'description':
+          'Your booking request has been submitted. Waiting for admin to review. This process usually takes 1-2 hours.',
     },
     {
       'status': 'confirmed',
       'label': 'Confirmed',
       'icon': Icons.check_circle,
-      'description': 'Your booking has been confirmed by the admin. Please arrive at the workshop on your scheduled date.',
+      'description':
+          'Your booking has been confirmed by the admin. Please arrive at the workshop on your scheduled date.',
     },
     {
       'status': 'in_progress',
       'label': 'In Progress',
       'icon': Icons.build_circle,
-      'description': 'Your vehicle is currently being serviced. The technician will update the progress below.',
+      'description':
+          'Your vehicle is currently being serviced. The technician will update the progress below.',
     },
     {
       'status': 'completed',
       'label': 'Completed',
       'icon': Icons.task_alt,
-      'description': 'Service completed! Your vehicle is ready for pickup. Thank you for choosing us.',
+      'description':
+          'Service completed! Your vehicle is ready for pickup. Thank you for choosing us.',
     },
   ];
 
@@ -54,8 +66,9 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   }
 
   int _getStatusIndex(String status) {
-    final index =
-        _statusSteps.indexWhere((s) => s['status'] == status.toLowerCase());
+    final index = _statusSteps.indexWhere(
+      (s) => s['status'] == status.toLowerCase(),
+    );
     return index >= 0 ? index : 0;
   }
 
@@ -67,7 +80,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'Booking Details',
+          widget.fromHistory ? 'Service History' : 'Booking Details',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
         backgroundColor: Colors.transparent,
@@ -98,7 +111,9 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
           final bookingData = snapshot.data!.data() as Map<String, dynamic>;
           bookingData['id'] = bookingId;
 
-          final currentStatus = (bookingData['status'] ?? 'requested').toString().toLowerCase();
+          final currentStatus = (bookingData['status'] ?? 'requested')
+              .toString()
+              .toLowerCase();
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -121,8 +136,9 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   }
 
   Widget _buildHorizontalProgressTracker(Map<String, dynamic> booking) {
-    final currentStatus =
-        (booking['status'] ?? 'requested').toString().toLowerCase();
+    final currentStatus = (booking['status'] ?? 'requested')
+        .toString()
+        .toLowerCase();
     final currentIndex = _getStatusIndex(currentStatus);
     final isCancelled = currentStatus == 'cancelled';
 
@@ -164,7 +180,9 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                 return Expanded(
                   child: Container(
                     height: 3,
-                    color: isCompleted ? AppColors.primary : Colors.grey.shade300,
+                    color: isCompleted
+                        ? AppColors.primary
+                        : Colors.grey.shade300,
                   ),
                 );
               } else {
@@ -283,8 +301,9 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   }
 
   Widget _buildStatusTimeline(Map<String, dynamic> booking, String bookingId) {
-    final currentStatus =
-        (booking['status'] ?? 'requested').toString().toLowerCase();
+    final currentStatus = (booking['status'] ?? 'requested')
+        .toString()
+        .toLowerCase();
     final currentIndex = _getStatusIndex(currentStatus);
     final isCancelled = currentStatus == 'cancelled';
 
@@ -320,7 +339,10 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
@@ -381,7 +403,8 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
     required Map<String, dynamic> booking,
     required String bookingId,
   }) {
-    final showTechnicianUpdates = status == 'in_progress' && (isCompleted || isCurrent);
+    final showTechnicianUpdates =
+        status == 'in_progress' && (isCompleted || isCurrent);
 
     return IntrinsicHeight(
       child: Row(
@@ -417,7 +440,9 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                   child: Container(
                     width: 2,
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: isCompleted ? AppColors.primary : Colors.grey.shade300,
+                    color: isCompleted
+                        ? AppColors.primary
+                        : Colors.grey.shade300,
                   ),
                 ),
             ],
@@ -437,7 +462,9 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                           label,
                           style: GoogleFonts.poppins(
                             fontSize: 14,
-                            fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+                            fontWeight: isCurrent
+                                ? FontWeight.w600
+                                : FontWeight.w500,
                             color: isCompleted
                                 ? Theme.of(context).colorScheme.onSurface
                                 : Colors.grey,
@@ -446,7 +473,10 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                       ),
                       if (isCurrent)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(10),
@@ -481,7 +511,8 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                       ),
                     ),
                   // Status Description
-                  if (isCurrent || isCompleted) ...[                    const SizedBox(height: 8),
+                  if (isCurrent || isCompleted) ...[
+                    const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -490,7 +521,9 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                             : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(10),
                         border: isCurrent
-                            ? Border.all(color: AppColors.primary.withValues(alpha: 0.2))
+                            ? Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.2),
+                              )
                             : null,
                       ),
                       child: Text(
@@ -506,8 +539,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                     ),
                   ],
                   // Technician Updates for In Progress
-                  if (showTechnicianUpdates)
-                    _buildTechnicianUpdates(bookingId),
+                  if (showTechnicianUpdates) _buildTechnicianUpdates(bookingId),
                 ],
               ),
             ),
@@ -538,7 +570,11 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.hourglass_empty, size: 18, color: Colors.orange[700]),
+                  Icon(
+                    Icons.hourglass_empty,
+                    size: 18,
+                    color: Colors.orange[700],
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -593,7 +629,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
     final type = update['type'] ?? 'update';
     final title = update['title'] ?? 'Update';
     final description = update['description'] ?? '';
-    
+
     // Handle photos as either a single string or an array
     List<String> photos = [];
     final photosData = update['photos'];
@@ -744,10 +780,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         child: Stack(
           children: [
             InteractiveViewer(
-              child: Image.network(
-                photoUrl,
-                fit: BoxFit.contain,
-              ),
+              child: Image.network(photoUrl, fit: BoxFit.contain),
             ),
             Positioned(
               top: 10,
@@ -790,8 +823,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
     }
 
     // Fallback: show updatedAt for current status
-    final currentStatus =
-        (booking['status'] ?? '').toString().toLowerCase();
+    final currentStatus = (booking['status'] ?? '').toString().toLowerCase();
     if (status == currentStatus && booking['updatedAt'] != null) {
       try {
         final date = (booking['updatedAt'] as Timestamp).toDate();
@@ -810,10 +842,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         icon: const Icon(Icons.cancel_outlined, size: 18),
         label: Text(
           'Cancel Booking',
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500),
         ),
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.red,
@@ -878,7 +907,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       });
 
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -893,7 +922,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -909,10 +938,8 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   void _showChatDialog(BuildContext context, String bookingId) {
     showDialog(
       context: context,
-      builder: (context) => _ChatDialog(
-        bookingId: bookingId,
-        firestore: _firestore,
-      ),
+      builder: (context) =>
+          _ChatDialog(bookingId: bookingId, firestore: _firestore),
     );
   }
 }
@@ -921,10 +948,7 @@ class _ChatDialog extends StatefulWidget {
   final String bookingId;
   final FirebaseFirestore firestore;
 
-  const _ChatDialog({
-    required this.bookingId,
-    required this.firestore,
-  });
+  const _ChatDialog({required this.bookingId, required this.firestore});
 
   @override
   State<_ChatDialog> createState() => _ChatDialogState();
@@ -933,6 +957,10 @@ class _ChatDialog extends StatefulWidget {
 class _ChatDialogState extends State<_ChatDialog> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ChatService _chatService = ChatService();
+  final ImagePickerService _imagePickerService = ImagePickerService();
+  final FileUploadService _fileUploadService = FileUploadService();
+  bool _isSendingImage = false;
 
   @override
   void dispose() {
@@ -957,7 +985,10 @@ class _ChatDialogState extends State<_ChatDialog> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
+                    const Icon(
+                      Icons.chat_bubble_outline,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Chat with Admin',
@@ -992,8 +1023,11 @@ class _ChatDialogState extends State<_ChatDialog> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.chat_bubble_outline,
-                              size: 48, color: Colors.grey[300]),
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 48,
+                            color: Colors.grey[300],
+                          ),
                           const SizedBox(height: 8),
                           Text(
                             'No messages yet',
@@ -1030,7 +1064,8 @@ class _ChatDialogState extends State<_ChatDialog> {
                     itemBuilder: (context, index) {
                       final message =
                           messages[index].data() as Map<String, dynamic>;
-                      final isMe = message['senderId'] ==
+                      final isMe =
+                          message['senderId'] ==
                           FirebaseAuth.instance.currentUser?.uid;
                       return _buildMessageBubble(message, isMe);
                     },
@@ -1047,7 +1082,10 @@ class _ChatDialogState extends State<_ChatDialog> {
                     controller: _messageController,
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
-                      hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 14),
+                      hintStyle: GoogleFonts.poppins(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
                       filled: true,
                       fillColor: Colors.grey.shade100,
                       border: OutlineInputBorder(
@@ -1063,7 +1101,29 @@ class _ChatDialogState extends State<_ChatDialog> {
                     textCapitalization: TextCapitalization.sentences,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
+                // Image attachment button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: _isSendingImage ? null : _pickAndSendImage,
+                    icon: _isSendingImage
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            Icons.image,
+                            color: Colors.grey.shade700,
+                            size: 20,
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 Container(
                   decoration: const BoxDecoration(
                     color: AppColors.primary,
@@ -1082,10 +1142,58 @@ class _ChatDialogState extends State<_ChatDialog> {
     );
   }
 
+  Future<void> _pickAndSendImage() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Use smaller size for base64 storage in Firestore
+    final file = await _imagePickerService.pickFromGallery(
+      maxWidth: 400,
+      quality: 60,
+    );
+    if (file == null) return;
+
+    setState(() => _isSendingImage = true);
+
+    try {
+      // Get user name
+      final userDoc = await widget.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final userData = userDoc.data() ?? {};
+      final userName = userData['fullName'] ?? userData['name'] ?? 'Customer';
+
+      // Convert image to base64
+      final imageBase64 = await _fileUploadService.imageToBase64(file);
+
+      await _chatService.sendImageMessage(
+        bookingId: widget.bookingId,
+        senderId: user.uid,
+        senderName: userName,
+        senderRole: 'customer',
+        imageUrl: imageBase64,  // Store base64 string
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSendingImage = false);
+    }
+  }
+
   Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
     final text = message['text'] ?? '';
     final senderName = message['senderName'] ?? 'Unknown';
     final senderRole = message['senderRole'] ?? '';
+    final messageType = message['type'] ?? 'text';
+    final imageUrl = message['imageUrl'];
 
     String timeStr = '';
     if (message['createdAt'] != null) {
@@ -1104,8 +1212,9 @@ class _ChatDialogState extends State<_ChatDialog> {
           maxWidth: MediaQuery.of(context).size.width * 0.55,
         ),
         child: Column(
-          crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isMe
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             if (!isMe)
               Padding(
@@ -1120,7 +1229,9 @@ class _ChatDialogState extends State<_ChatDialog> {
                 ),
               ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: messageType == 'image'
+                  ? const EdgeInsets.all(4)
+                  : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: isMe ? AppColors.primary : Colors.grey.shade100,
                 borderRadius: BorderRadius.only(
@@ -1130,22 +1241,53 @@ class _ChatDialogState extends State<_ChatDialog> {
                   bottomRight: Radius.circular(isMe ? 4 : 14),
                 ),
               ),
-              child: Text(
-                text,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: isMe ? Colors.white : Colors.black87,
-                ),
-              ),
+              child: messageType == 'image' && imageUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        imageUrl,
+                        width: 180,
+                        height: 180,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return SizedBox(
+                            width: 180,
+                            height: 180,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: progress.expectedTotalBytes != null
+                                    ? progress.cumulativeBytesLoaded /
+                                          progress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stack) => Container(
+                          width: 180,
+                          height: 100,
+                          color: Colors.grey.shade300,
+                          child: const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Text(
+                      text,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: isMe ? Colors.white : Colors.black87,
+                      ),
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
               child: Text(
                 timeStr,
-                style: GoogleFonts.poppins(
-                  fontSize: 9,
-                  color: Colors.grey,
-                ),
+                style: GoogleFonts.poppins(fontSize: 9, color: Colors.grey),
               ),
             ),
           ],
@@ -1165,7 +1307,10 @@ class _ChatDialogState extends State<_ChatDialog> {
 
     try {
       // Get user data for name
-      final userDoc = await widget.firestore.collection('users').doc(user.uid).get();
+      final userDoc = await widget.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
       final userData = userDoc.data() ?? {};
       final userName = userData['fullName'] ?? userData['name'] ?? 'Customer';
 
@@ -1174,12 +1319,12 @@ class _ChatDialogState extends State<_ChatDialog> {
           .doc(widget.bookingId)
           .collection('messages')
           .add({
-        'text': text,
-        'senderId': user.uid,
-        'senderName': userName,
-        'senderRole': 'customer',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+            'text': text,
+            'senderId': user.uid,
+            'senderName': userName,
+            'senderRole': 'customer',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
