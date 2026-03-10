@@ -19,6 +19,7 @@ class SparePartService {
           'price': data['price'] ?? 0,
           'stock': data['stock'] ?? 0,
           'type': data['type'] ?? '',
+          'imageUrl': data['imageUrl'] ?? '',
         };
       }).toList();
     } catch (e) {
@@ -59,6 +60,7 @@ class SparePartService {
           'price': data['price'] ?? 0,
           'stock': data['stock'] ?? 0,
           'type': data['type'] ?? '',
+          'imageUrl': data['imageUrl'] ?? '',
         };
       }).toList();
     } catch (e) {

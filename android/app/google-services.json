@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "925167052954",
+    "firebase_url": "https://carsync-mi-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "carsync-mi",
     "storage_bucket": "carsync-mi.firebasestorage.app"
   },

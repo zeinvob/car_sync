@@ -11,6 +11,8 @@ class FileUploadService {
     required String bookingId,
     required String fileName,
   }) async {
+    print('Using bucket: ${FirebaseStorage.instance.bucket}');
+
     final ref = _storage.ref().child(
       'chat_uploads/$bookingId/images/$fileName',
     );
@@ -24,9 +26,7 @@ class FileUploadService {
     required String bookingId,
     required String fileName,
   }) async {
-    final ref = _storage.ref().child(
-      'chat_uploads/$bookingId/files/$fileName',
-    );
+    final ref = _storage.ref().child('chat_uploads/$bookingId/files/$fileName');
 
     final task = await ref.putFile(file);
     return await task.ref.getDownloadURL();
