@@ -573,31 +573,37 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final List<Map<String, dynamic>> newsItems = [
       {
         'title': 'Free Car Check-up',
+        'subtitle': 'LIMITED TIME',
         'description': 'Get a complimentary 20-point inspection with any service booking this month!',
-        'icon': Icons.local_offer_outlined,
-        'color': const Color(0xFF4CAF50),
+        'icon': Icons.verified_outlined,
+        'gradient': [const Color(0xFF667eea), const Color(0xFF764ba2)],
+        'emoji': '🎁',
       },
       {
         'title': 'New Workshop Partner',
+        'subtitle': 'ANNOUNCEMENT',
         'description': 'We\'ve partnered with Premium Auto Care - now available in your area.',
         'icon': Icons.handshake_outlined,
-        'color': const Color(0xFF2196F3),
+        'gradient': [const Color(0xFF0083B0), const Color(0xFF00B4DB)],
+        'emoji': '🤝',
       },
       {
         'title': 'Spare Parts Sale',
-        'description': 'Up to 20% off on selected spare parts. Check out our catalogue!',
-        'icon': Icons.discount_outlined,
-        'color': const Color(0xFFFF9800),
+        'subtitle': 'UP TO 20% OFF',
+        'description': 'Exclusive discounts on selected spare parts. Check out our catalogue!',
+        'icon': Icons.local_fire_department_outlined,
+        'gradient': [const Color(0xFFf5af19), const Color(0xFFf12711)],
+        'emoji': '🔥',
       },
     ];
 
     return Column(
       children: [
         SizedBox(
-          height: 160,
+          height: 175,
           child: PageView.builder(
             itemCount: newsItems.length,
-            controller: PageController(viewportFraction: 0.95),
+            controller: PageController(viewportFraction: 0.92),
             onPageChanged: (index) {
               setState(() {
                 _currentNewsIndex = index;
@@ -605,84 +611,142 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             },
             itemBuilder: (context, index) {
               final news = newsItems[index];
+              final gradientColors = news['gradient'] as List<Color>;
               return Container(
-                margin: const EdgeInsets.only(right: 12),
+                margin: const EdgeInsets.only(right: 12, bottom: 4),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      (news['color'] as Color).withOpacity(0.9),
-                      (news['color'] as Color).withOpacity(0.7),
-                    ],
+                    colors: gradientColors,
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: (news['color'] as Color).withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                      color: gradientColors[0].withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              news['title'] as String,
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              news['description'] as String,
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: Colors.white.withOpacity(0.9),
-                                height: 1.4,
-                              ),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Container(
-                        padding: const EdgeInsets.all(12),
+                child: Stack(
+                  children: [
+                    // Decorative circles
+                    Positioned(
+                      top: -30,
+                      right: -30,
+                      child: Container(
+                        width: 120,
+                        height: 120,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          news['icon'] as IconData,
-                          size: 36,
-                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.1),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    Positioned(
+                      bottom: -40,
+                      right: 40,
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.08),
+                        ),
+                      ),
+                    ),
+                    // Content
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Subtitle badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.25),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    news['subtitle'] as String,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  news['title'] as String,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    height: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  news['description'] as String,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.white.withOpacity(0.9),
+                                    height: 1.4,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Emoji/Icon section
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                news['emoji'] as String,
+                                style: const TextStyle(fontSize: 28),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               );
             },
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         // Page indicator dots
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(
             newsItems.length,
-            (index) => Container(
+            (index) => AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
               margin: const EdgeInsets.symmetric(horizontal: 4),
               width: _currentNewsIndex == index ? 24 : 8,
               height: 8,
