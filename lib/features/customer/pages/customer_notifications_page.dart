@@ -198,166 +198,364 @@ class _CustomerNotificationsPageState extends State<CustomerNotificationsPage> {
                   : <String, dynamic>{};
               final String? newStatus = extraData['newStatus']?.toString();
 
-              return GestureDetector(
-                onTap: () async {
-                  // Mark as read
-                  await _notificationService.markNotificationAsReadForUser(
-                    notificationId: item['id'],
-                    userId: user.uid,
-                  );
-
-                  // Navigate to booking details if available
-                  final relatedBookingId = (item['relatedBookingId'] ?? '')
-                      .toString();
-
-                  if (relatedBookingId.isNotEmpty && mounted) {
-                    // Fetch booking data from Firestore
-                    try {
-                      final bookingDoc = await FirebaseFirestore.instance
-                          .collection('bookings')
-                          .doc(relatedBookingId)
-                          .get();
-
-                      if (bookingDoc.exists && mounted) {
-                        final bookingData = bookingDoc.data()!;
-                        bookingData['id'] = bookingDoc.id;
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                BookingDetailsPage(booking: bookingData),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      debugPrint('Error fetching booking: $e');
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Could not load booking details'),
-                          ),
-                        );
-                      }
-                    }
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isRead
-                        ? Theme.of(context).cardColor
-                        : Theme.of(context).cardColor.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(14),
-                    border: isRead
-                        ? null
-                        : Border.all(
-                            color: _getNotificationColor(
-                              newStatus,
-                            ).withOpacity(0.3),
-                            width: 1,
-                          ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Icon
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isRead
-                              ? Colors.grey.withOpacity(0.15)
-                              : _getNotificationColor(
-                                  newStatus,
-                                ).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          _getNotificationIcon(type),
-                          color: isRead
-                              ? Colors.grey[600]
-                              : _getNotificationColor(newStatus),
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-
-                      // Content
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    item['title'] ?? 'Notification',
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: isRead
-                                          ? FontWeight.w500
-                                          : FontWeight.w600,
-                                      fontSize: 14,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface,
-                                    ),
-                                  ),
-                                ),
-                                if (!isRead)
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: _getNotificationColor(newStatus),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item['body'] ?? '',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _formatTimestamp(item['createdAt']),
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Chevron
-                      Icon(
-                        Icons.chevron_right,
-                        color: Colors.grey[400],
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                ),
+              return _NotificationItem(
+                item: item,
+                isRead: isRead,
+                type: type,
+                newStatus: newStatus,
+                userId: user.uid,
+                notificationService: _notificationService,
+                getNotificationIcon: _getNotificationIcon,
+                getNotificationColor: _getNotificationColor,
+                formatTimestamp: _formatTimestamp,
               );
             },
           );
         },
       ),
+    );
+  }
+}
+
+class _NotificationItem extends StatefulWidget {
+  final Map<String, dynamic> item;
+  final bool isRead;
+  final String type;
+  final String? newStatus;
+  final String userId;
+  final NotificationService notificationService;
+  final IconData Function(String) getNotificationIcon;
+  final Color Function(String?) getNotificationColor;
+  final String Function(dynamic) formatTimestamp;
+
+  const _NotificationItem({
+    required this.item,
+    required this.isRead,
+    required this.type,
+    required this.newStatus,
+    required this.userId,
+    required this.notificationService,
+    required this.getNotificationIcon,
+    required this.getNotificationColor,
+    required this.formatTimestamp,
+  });
+
+  @override
+  State<_NotificationItem> createState() => _NotificationItemState();
+}
+
+class _NotificationItemState extends State<_NotificationItem> {
+  double _dragExtent = 0;
+  bool _showActions = false;
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      _dragExtent += details.delta.dx;
+      _dragExtent = _dragExtent.clamp(-200.0, 0.0);
+      _showActions = _dragExtent < -50;
+    });
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    // Full swipe (past -180) = direct delete
+    if (_dragExtent < -180 && widget.isRead) {
+      _deleteNotification();
+    } 
+    // Partial swipe = show action buttons
+    else if (_dragExtent < -80) {
+      setState(() {
+        _dragExtent = -140;
+        _showActions = true;
+      });
+    } 
+    // Not enough swipe = reset
+    else {
+      _resetPosition();
+    }
+  }
+
+  void _resetPosition() {
+    setState(() {
+      _dragExtent = 0;
+      _showActions = false;
+    });
+  }
+
+  Future<void> _deleteNotification() async {
+    if (!widget.isRead) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please read the notification before deleting',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      _resetPosition();
+      return;
+    }
+
+    await widget.notificationService.deleteNotification(widget.item['id']);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Notification deleted', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _markAsUnread() async {
+    // Remove user from isReadBy array
+    await FirebaseFirestore.instance
+        .collection('notifications')
+        .doc(widget.item['id'])
+        .update({
+      'isReadBy': FieldValue.arrayRemove([widget.userId]),
+    });
+    _resetPosition();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Background with action buttons
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Mark as Unread button
+                if (widget.isRead)
+                  GestureDetector(
+                    onTap: _markAsUnread,
+                    child: Container(
+                      width: 70,
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.mark_email_unread, color: Colors.white, size: 22),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Unread',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // Delete button
+                GestureDetector(
+                  onTap: _deleteNotification,
+                  child: Container(
+                    width: 70,
+                    decoration: BoxDecoration(
+                      color: widget.isRead ? Colors.red : Colors.grey,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.delete_outline, color: Colors.white, size: 22),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Delete',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Foreground notification card
+        GestureDetector(
+          onHorizontalDragUpdate: _handleDragUpdate,
+          onHorizontalDragEnd: _handleDragEnd,
+          onTap: () async {
+            if (_showActions) {
+              _resetPosition();
+              return;
+            }
+            
+            // Mark as read
+            await widget.notificationService.markNotificationAsReadForUser(
+              notificationId: widget.item['id'],
+              userId: widget.userId,
+            );
+
+            // Get the status from extraData
+            final extraData = (widget.item['extraData'] is Map<String, dynamic>)
+                ? widget.item['extraData'] as Map<String, dynamic>
+                : <String, dynamic>{};
+            final String? newStatus = extraData['newStatus']?.toString();
+
+            // Navigate to booking details if available
+            final relatedBookingId = (widget.item['relatedBookingId'] ?? '').toString();
+
+            if (relatedBookingId.isNotEmpty && mounted) {
+              try {
+                final bookingDoc = await FirebaseFirestore.instance
+                    .collection('bookings')
+                    .doc(relatedBookingId)
+                    .get();
+
+                if (bookingDoc.exists && mounted) {
+                  final bookingData = bookingDoc.data()!;
+                  bookingData['id'] = bookingDoc.id;
+
+                  // For completed bookings, navigate to BookingDetailsPage with fromHistory flag
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BookingDetailsPage(
+                        booking: bookingData,
+                        fromHistory: newStatus?.toLowerCase() == 'completed',
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                debugPrint('Error fetching booking: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not load booking details')),
+                  );
+                }
+              }
+            }
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 100),
+            transform: Matrix4.translationValues(_dragExtent, 0, 0),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: widget.isRead
+                    ? Theme.of(context).cardColor
+                    : Theme.of(context).cardColor.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(14),
+                border: widget.isRead
+                    ? null
+                    : Border.all(
+                        color: widget.getNotificationColor(widget.newStatus).withOpacity(0.3),
+                        width: 1,
+                      ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Icon
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: widget.isRead
+                          ? Colors.grey.withOpacity(0.15)
+                          : widget.getNotificationColor(widget.newStatus).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      widget.getNotificationIcon(widget.type),
+                      color: widget.isRead
+                          ? Colors.grey[600]
+                          : widget.getNotificationColor(widget.newStatus),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+
+                  // Content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.item['title'] ?? 'Notification',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: widget.isRead ? FontWeight.w500 : FontWeight.w600,
+                                  fontSize: 14,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            if (!widget.isRead)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: widget.getNotificationColor(widget.newStatus),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.item['body'] ?? '',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.formatTimestamp(widget.item['createdAt']),
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Chevron
+                  Icon(
+                    Icons.chevron_right,
+                    color: Colors.grey[400],
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

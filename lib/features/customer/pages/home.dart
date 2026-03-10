@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/services/user_service.dart';
 import 'package:car_sync/core/services/booking_service.dart';
@@ -9,6 +11,12 @@ import 'package:car_sync/features/customer/pages/add_vehicle_page.dart';
 import 'package:car_sync/features/customer/pages/book_service_page.dart';
 import 'package:car_sync/features/customer/pages/booking_details_page.dart';
 import 'package:car_sync/features/customer/pages/customer_notifications_page.dart';
+import 'package:car_sync/features/customer/pages/edit_profile_page.dart';
+import 'package:car_sync/features/customer/pages/help_support_page.dart';
+import 'package:car_sync/features/customer/pages/contact_us_page.dart';
+import 'package:car_sync/features/customer/pages/about_page.dart';
+import 'package:car_sync/features/customer/pages/spare_parts_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -34,6 +42,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   // User data
   String _userName = '';
   String _userEmail = '';
+  String? _profileImageUrl;
   List<Map<String, dynamic>> _activeBookings = [];
   List<Map<String, dynamic>> _vehicles = [];
 
@@ -60,6 +69,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               user.displayName ??
               'Customer';
           _userEmail = userData?['email'] ?? user.email ?? '';
+          _profileImageUrl = userData?['profileImageUrl'];
         });
 
         // Load active bookings for this customer
@@ -120,6 +130,23 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
+  /// Get image provider from base64 string or URL
+  ImageProvider? _getProfileImageProvider() {
+    if (_profileImageUrl == null) return null;
+
+    if (_profileImageUrl!.startsWith('data:image')) {
+      // Base64 data URI format
+      final base64String = _profileImageUrl!.split(',').last;
+      return MemoryImage(base64Decode(base64String));
+    } else if (_profileImageUrl!.startsWith('http')) {
+      // Regular URL
+      return NetworkImage(_profileImageUrl!);
+    } else {
+      // Plain base64 string
+      return MemoryImage(base64Decode(_profileImageUrl!));
+    }
+  }
+
   /// ============ HOME TAB ============
   Widget _buildHomePage() {
     return SafeArea(
@@ -135,22 +162,22 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               _buildHeader(),
               const SizedBox(height: 24),
 
+              // Latest News & Updates Banner
+              _buildSectionTitle('Latest Updates'),
+              const SizedBox(height: 12),
+              _buildNewsBanner(),
+              const SizedBox(height: 24),
+
               // Quick Actions
               _buildSectionTitle('Quick Actions'),
               const SizedBox(height: 12),
               _buildQuickActions(),
               const SizedBox(height: 24),
 
-              // Active Booking Status
-              _buildSectionTitle('Active Booking'),
+              // Upcoming Booking Status
+              _buildSectionTitle('Upcoming Booking'),
               const SizedBox(height: 12),
               _buildActiveBookingCard(),
-              const SizedBox(height: 24),
-
-              // Recent Services
-              _buildSectionTitle('Recent Services'),
-              const SizedBox(height: 12),
-              _buildRecentServices(),
             ],
           ),
         ),
@@ -161,25 +188,30 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   Widget _buildHeader() {
     return Row(
       children: [
-        // Avatar
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.gradientStart, AppColors.gradientEnd],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        // Avatar - tap to go to profile
+        GestureDetector(
+          onTap: () {
+            setState(() => _currentIndex = 3);
+          },
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
             ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Center(
-            child: Text(
-              _userName.isNotEmpty ? _userName[0].toUpperCase() : 'C',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
+            child: Center(
+              child: Text(
+                _userName.isNotEmpty ? _userName[0].toUpperCase() : 'C',
+                style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -288,75 +320,57 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Widget _buildQuickActions() {
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.calendar_month_outlined,
-                label: 'Book Service',
-                color: AppColors.primary,
-                onTap: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const BookServicePage()),
-                  );
-                  if (result == true) {
-                    _loadUserData(); // Refresh bookings
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.history,
-                label: 'History',
-                color: AppColors.gradientEnd,
-                onTap: () {
-                  setState(() => _currentIndex = 1);
-                },
-              ),
-            ),
-          ],
+        _buildQuickActionItem(
+          icon: Icons.calendar_month_outlined,
+          label: 'Book',
+          color: AppColors.primary,
+          onTap: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BookServicePage()),
+            );
+            if (result == true) {
+              _loadUserData();
+            }
+          },
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.directions_car_outlined,
-                label: 'My Cars',
-                color: Colors.orange,
-                onTap: () {
-                  setState(() => _currentIndex = 2);
-                },
+        _buildQuickActionItem(
+          icon: Icons.history,
+          label: 'History',
+          color: AppColors.gradientEnd,
+          onTap: () {
+            setState(() => _currentIndex = 1);
+          },
+        ),
+        _buildQuickActionItem(
+          icon: Icons.directions_car_outlined,
+          label: 'My Cars',
+          color: Colors.orange,
+          onTap: () {
+            setState(() => _currentIndex = 2);
+          },
+        ),
+        _buildQuickActionItem(
+          icon: Icons.build_outlined,
+          label: 'Spare Parts',
+          color: Colors.teal,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const SparePartsPage(),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.build_outlined,
-                label: 'Spare Parts',
-                color: Colors.teal,
-                onTap: () {
-                  // TODO: Navigate to spare parts page
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Browse Spare Parts coming soon!'),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _buildActionCard({
+  Widget _buildQuickActionItem({
     required IconData icon,
     required String label,
     required Color color,
@@ -364,44 +378,46 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(14),
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 26),
+            child: Icon(icon, color: color, size: 26),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  String _formatBookingDate(dynamic date) {
+    if (date == null) return 'N/A';
+    try {
+      DateTime dateTime;
+      if (date is Timestamp) {
+        dateTime = date.toDate();
+      } else if (date is String) {
+        dateTime = DateTime.parse(date);
+      } else {
+        return 'N/A';
+      }
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    } catch (e) {
+      return 'N/A';
+    }
   }
 
   Widget _buildActiveBookingCard() {
@@ -430,7 +446,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No Active Booking',
+              'No Upcoming Booking',
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -494,7 +510,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                booking['serviceName'] ?? 'Service',
+                booking['serviceType'] ?? 'Service',
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -526,9 +542,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             children: [
               const Icon(Icons.directions_car, color: Colors.white70, size: 18),
               const SizedBox(width: 8),
-              Text(
-                booking['carPlate'] ?? 'N/A',
-                style: GoogleFonts.poppins(color: Colors.white70),
+              Expanded(
+                child: Text(
+                  booking['vehicleDisplay'] ?? 'N/A',
+                  style: GoogleFonts.poppins(color: Colors.white70),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -538,7 +557,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               const Icon(Icons.calendar_today, color: Colors.white70, size: 18),
               const SizedBox(width: 8),
               Text(
-                booking['date'] ?? 'N/A',
+                _formatBookingDate(booking['bookingDate']),
                 style: GoogleFonts.poppins(color: Colors.white70),
               ),
             ],
@@ -548,111 +567,264 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  Widget _buildRecentServices() {
-    // Placeholder recent services
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+  int _currentNewsIndex = 0;
+
+  Widget _buildNewsBanner() {
+    final List<Map<String, dynamic>> newsItems = [
+      {
+        'title': 'Free Car Check-up',
+        'description': 'Get a complimentary 20-point inspection with any service booking this month!',
+        'icon': Icons.local_offer_outlined,
+        'color': const Color(0xFF4CAF50),
+      },
+      {
+        'title': 'New Workshop Partner',
+        'description': 'We\'ve partnered with Premium Auto Care - now available in your area.',
+        'icon': Icons.handshake_outlined,
+        'color': const Color(0xFF2196F3),
+      },
+      {
+        'title': 'Spare Parts Sale',
+        'description': 'Up to 20% off on selected spare parts. Check out our catalogue!',
+        'icon': Icons.discount_outlined,
+        'color': const Color(0xFFFF9800),
+      },
+    ];
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 160,
+          child: PageView.builder(
+            itemCount: newsItems.length,
+            controller: PageController(viewportFraction: 0.95),
+            onPageChanged: (index) {
+              setState(() {
+                _currentNewsIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              final news = newsItems[index];
+              return Container(
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      (news['color'] as Color).withOpacity(0.9),
+                      (news['color'] as Color).withOpacity(0.7),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (news['color'] as Color).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              news['title'] as String,
+                              style: GoogleFonts.poppins(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              news['description'] as String,
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.9),
+                                height: 1.4,
+                              ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          news['icon'] as IconData,
+                          size: 36,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.history_outlined, size: 48, color: Colors.grey[400]),
-          const SizedBox(height: 12),
-          Text(
-            'No Service History',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600],
+        ),
+        const SizedBox(height: 12),
+        // Page indicator dots
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            newsItems.length,
+            (index) => Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: _currentNewsIndex == index ? 24 : 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _currentNewsIndex == index
+                    ? AppColors.primary
+                    : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Your completed services will appear here',
-            style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[500]),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   /// ============ BOOKINGS TAB ============
   Widget _buildBookingsPage() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'My Bookings',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
+    // Separate active bookings from completed (history)
+    final activeBookings = _activeBookings.where((b) {
+      final status = (b['status'] ?? '').toString().toLowerCase();
+      return status != 'completed' && status != 'cancelled';
+    }).toList();
+
+    final historyBookings = _activeBookings.where((b) {
+      final status = (b['status'] ?? '').toString().toLowerCase();
+      return status == 'completed' || status == 'cancelled';
+    }).toList();
+
+    return DefaultTabController(
+      length: 2,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'My Bookings',
+                style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: _activeBookings.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.event_note_outlined,
-                            size: 80,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No Bookings Yet',
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Your booking history will appear here',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadUserData,
-                      child: ListView.builder(
-                        itemCount: _activeBookings.length,
-                        itemBuilder: (context, index) {
-                          final booking = _activeBookings[index];
-                          return _buildBookingCard(booking);
-                        },
-                      ),
-                    ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              // Tab Bar
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TabBar(
+                  indicator: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.grey[600],
+                  labelStyle: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  tabs: [
+                    Tab(text: 'Active (${activeBookings.length})'),
+                    Tab(text: 'History (${historyBookings.length})'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Tab Views
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    // Active Bookings Tab
+                    _buildBookingsList(activeBookings, isHistory: false),
+                    // History Tab
+                    _buildBookingsList(historyBookings, isHistory: true),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildBookingCard(Map<String, dynamic> booking) {
+  Widget _buildBookingsList(List<Map<String, dynamic>> bookings, {required bool isHistory}) {
+    if (bookings.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isHistory ? Icons.history : Icons.event_note_outlined,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isHistory ? 'No History Yet' : 'No Active Bookings',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isHistory
+                  ? 'Your completed services will appear here'
+                  : 'Book a service to get started',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadUserData,
+      child: ListView.builder(
+        itemCount: bookings.length,
+        itemBuilder: (context, index) {
+          final booking = bookings[index];
+          return _buildBookingCard(booking, isHistory: isHistory);
+        },
+      ),
+    );
+  }
+
+  Widget _buildBookingCard(Map<String, dynamic> booking, {bool isHistory = false}) {
     final status = (booking['status'] ?? 'pending')
         .toString()
         .toLowerCase()
@@ -858,18 +1030,21 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _showBookingDetailsDialog(booking),
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  onPressed: () => _showBookingDetailsDialog(booking, isHistory: isHistory),
+                  icon: Icon(
+                    isHistory ? Icons.history : Icons.visibility_outlined,
+                    size: 18,
+                  ),
                   label: Text(
-                    'View Details',
+                    isHistory ? 'View History' : 'View Details',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary),
+                    foregroundColor: isHistory ? Colors.teal : AppColors.primary,
+                    side: BorderSide(color: isHistory ? Colors.teal : AppColors.primary),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -884,11 +1059,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  void _showBookingDetailsDialog(Map<String, dynamic> booking) {
+  void _showBookingDetailsDialog(Map<String, dynamic> booking, {bool isHistory = false}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BookingDetailsPage(booking: booking),
+        builder: (context) => BookingDetailsPage(
+          booking: booking,
+          fromHistory: isHistory,
+        ),
       ),
     ).then((_) => _loadUserData()); // Refresh on return
   }
@@ -1203,6 +1381,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   /// ============ PROFILE TAB ============
   Widget _buildProfilePage() {
+    final imageProvider = _getProfileImageProvider();
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -1215,23 +1395,33 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                gradient: imageProvider == null
+                    ? const LinearGradient(
+                        colors: [
+                          AppColors.gradientStart,
+                          AppColors.gradientEnd,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
                 borderRadius: BorderRadius.circular(50),
+                image: imageProvider != null
+                    ? DecorationImage(image: imageProvider, fit: BoxFit.cover)
+                    : null,
               ),
-              child: Center(
-                child: Text(
-                  _userName.isNotEmpty ? _userName[0].toUpperCase() : 'C',
-                  style: GoogleFonts.poppins(
-                    fontSize: 40,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              child: imageProvider == null
+                  ? Center(
+                      child: Text(
+                        _userName.isNotEmpty ? _userName[0].toUpperCase() : 'C',
+                        style: GoogleFonts.poppins(
+                          fontSize: 40,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(height: 16),
 
@@ -1254,10 +1444,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             _buildProfileOption(
               icon: Icons.person_outline,
               title: 'Edit Profile',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Edit Profile coming soon!')),
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EditProfilePage()),
                 );
+                if (result == true) {
+                  _loadUserData(); // Refresh user data after edit
+                }
               },
             ),
             _buildProfileOption(
@@ -1273,8 +1467,19 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               icon: Icons.help_outline,
               title: 'Help & Support',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Help & Support coming soon!')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HelpSupportPage()),
+                );
+              },
+            ),
+            _buildProfileOption(
+              icon: Icons.headset_mic_outlined,
+              title: 'Contact Us',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ContactUsPage()),
                 );
               },
             ),
@@ -1282,8 +1487,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               icon: Icons.info_outline,
               title: 'About',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('About coming soon!')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AboutPage()),
                 );
               },
             ),
