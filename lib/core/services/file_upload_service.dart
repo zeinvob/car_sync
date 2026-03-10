@@ -36,13 +36,13 @@ class FileUploadService {
     await _storage.refFromURL(url).delete();
   }
 
-  /// Convert image file to base64 string for storing in Firestore
-  /// Image should be small (< 500KB) to fit within Firestore document limits
+  /// convert image file to base64 string for storing in Firestore
+  /// image should be small (< 500KB) to fit within Firestore document limits
   Future<String> imageToBase64(File file) async {
     try {
       print('Converting image to base64 for Firestore...');
-      final bytes = await file.readAsBytes();
-      
+      final bytes = await file.readAsBytes(); 
+
       // Check file size - warn if too large
       final sizeKB = bytes.length / 1024;
       print('Image size: ${sizeKB.toStringAsFixed(1)} KB');
