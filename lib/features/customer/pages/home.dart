@@ -12,6 +12,9 @@ import 'package:car_sync/features/customer/pages/book_service_page.dart';
 import 'package:car_sync/features/customer/pages/booking_details_page.dart';
 import 'package:car_sync/features/customer/pages/customer_notifications_page.dart';
 import 'package:car_sync/features/customer/pages/edit_profile_page.dart';
+import 'package:car_sync/features/customer/pages/help_support_page.dart';
+import 'package:car_sync/features/customer/pages/contact_us_page.dart';
+import 'package:car_sync/features/customer/pages/about_page.dart';
 import 'package:car_sync/features/customer/pages/spare_parts_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -638,70 +641,130 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   /// ============ BOOKINGS TAB ============
   Widget _buildBookingsPage() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'My Bookings',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
+    // Separate active bookings from completed (history)
+    final activeBookings = _activeBookings.where((b) {
+      final status = (b['status'] ?? '').toString().toLowerCase();
+      return status != 'completed' && status != 'cancelled';
+    }).toList();
+
+    final historyBookings = _activeBookings.where((b) {
+      final status = (b['status'] ?? '').toString().toLowerCase();
+      return status == 'completed' || status == 'cancelled';
+    }).toList();
+
+    return DefaultTabController(
+      length: 2,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'My Bookings',
+                style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: _activeBookings.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.event_note_outlined,
-                            size: 80,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No Bookings Yet',
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Your booking history will appear here',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadUserData,
-                      child: ListView.builder(
-                        itemCount: _activeBookings.length,
-                        itemBuilder: (context, index) {
-                          final booking = _activeBookings[index];
-                          return _buildBookingCard(booking);
-                        },
-                      ),
-                    ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              // Tab Bar
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TabBar(
+                  indicator: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.grey[600],
+                  labelStyle: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  tabs: [
+                    Tab(text: 'Active (${activeBookings.length})'),
+                    Tab(text: 'History (${historyBookings.length})'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Tab Views
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    // Active Bookings Tab
+                    _buildBookingsList(activeBookings, isHistory: false),
+                    // History Tab
+                    _buildBookingsList(historyBookings, isHistory: true),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildBookingCard(Map<String, dynamic> booking) {
+  Widget _buildBookingsList(List<Map<String, dynamic>> bookings, {required bool isHistory}) {
+    if (bookings.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isHistory ? Icons.history : Icons.event_note_outlined,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isHistory ? 'No History Yet' : 'No Active Bookings',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isHistory
+                  ? 'Your completed services will appear here'
+                  : 'Book a service to get started',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadUserData,
+      child: ListView.builder(
+        itemCount: bookings.length,
+        itemBuilder: (context, index) {
+          final booking = bookings[index];
+          return _buildBookingCard(booking, isHistory: isHistory);
+        },
+      ),
+    );
+  }
+
+  Widget _buildBookingCard(Map<String, dynamic> booking, {bool isHistory = false}) {
     final status = (booking['status'] ?? 'pending')
         .toString()
         .toLowerCase()
@@ -907,18 +970,21 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _showBookingDetailsDialog(booking),
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  onPressed: () => _showBookingDetailsDialog(booking, isHistory: isHistory),
+                  icon: Icon(
+                    isHistory ? Icons.history : Icons.visibility_outlined,
+                    size: 18,
+                  ),
                   label: Text(
-                    'View Details',
+                    isHistory ? 'View History' : 'View Details',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary),
+                    foregroundColor: isHistory ? Colors.teal : AppColors.primary,
+                    side: BorderSide(color: isHistory ? Colors.teal : AppColors.primary),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -933,11 +999,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  void _showBookingDetailsDialog(Map<String, dynamic> booking) {
+  void _showBookingDetailsDialog(Map<String, dynamic> booking, {bool isHistory = false}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BookingDetailsPage(booking: booking),
+        builder: (context) => BookingDetailsPage(
+          booking: booking,
+          fromHistory: isHistory,
+        ),
       ),
     ).then((_) => _loadUserData()); // Refresh on return
   }
@@ -1338,8 +1407,19 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               icon: Icons.help_outline,
               title: 'Help & Support',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Help & Support coming soon!')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HelpSupportPage()),
+                );
+              },
+            ),
+            _buildProfileOption(
+              icon: Icons.headset_mic_outlined,
+              title: 'Contact Us',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ContactUsPage()),
                 );
               },
             ),
@@ -1347,8 +1427,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               icon: Icons.info_outline,
               title: 'About',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('About coming soon!')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AboutPage()),
                 );
               },
             ),

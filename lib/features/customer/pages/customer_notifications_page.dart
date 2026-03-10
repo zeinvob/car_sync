@@ -406,6 +406,12 @@ class _NotificationItemState extends State<_NotificationItem> {
               userId: widget.userId,
             );
 
+            // Get the status from extraData
+            final extraData = (widget.item['extraData'] is Map<String, dynamic>)
+                ? widget.item['extraData'] as Map<String, dynamic>
+                : <String, dynamic>{};
+            final String? newStatus = extraData['newStatus']?.toString();
+
             // Navigate to booking details if available
             final relatedBookingId = (widget.item['relatedBookingId'] ?? '').toString();
 
@@ -420,10 +426,14 @@ class _NotificationItemState extends State<_NotificationItem> {
                   final bookingData = bookingDoc.data()!;
                   bookingData['id'] = bookingDoc.id;
 
+                  // For completed bookings, navigate to BookingDetailsPage with fromHistory flag
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => BookingDetailsPage(booking: bookingData),
+                      builder: (_) => BookingDetailsPage(
+                        booking: bookingData,
+                        fromHistory: newStatus?.toLowerCase() == 'completed',
+                      ),
                     ),
                   );
                 }

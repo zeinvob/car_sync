@@ -9,8 +9,13 @@ import 'package:car_sync/core/services/file_upload_service.dart';
 
 class BookingDetailsPage extends StatefulWidget {
   final Map<String, dynamic> booking;
+  final bool fromHistory;
 
-  const BookingDetailsPage({super.key, required this.booking});
+  const BookingDetailsPage({
+    super.key,
+    required this.booking,
+    this.fromHistory = false,
+  });
 
   @override
   State<BookingDetailsPage> createState() => _BookingDetailsPageState();
@@ -75,7 +80,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'Booking Details',
+          widget.fromHistory ? 'Service History' : 'Booking Details',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
         backgroundColor: Colors.transparent,
