@@ -13,8 +13,6 @@ class FileUploadService {
     required String bookingId,
     required String fileName,
   }) async {
-    print('Using bucket: ${FirebaseStorage.instance.bucket}');
-
     final ref = _storage.ref().child(
       'chat_uploads/$bookingId/images/$fileName',
     );
@@ -36,5 +34,31 @@ class FileUploadService {
 
   Future<void> deleteByUrl(String url) async {
     await _storage.refFromURL(url).delete();
+  }
+
+  /// Convert image file to base64 string for storing in Firestore
+  /// Image should be small (< 500KB) to fit within Firestore document limits
+  Future<String> imageToBase64(File file) async {
+    try {
+      print('Converting image to base64 for Firestore...');
+      final bytes = await file.readAsBytes();
+      
+      // Check file size - warn if too large
+      final sizeKB = bytes.length / 1024;
+      print('Image size: ${sizeKB.toStringAsFixed(1)} KB');
+      
+      if (sizeKB > 500) {
+        print('WARNING: Image is large (${sizeKB.toStringAsFixed(1)} KB). Consider using smaller image.');
+      }
+      
+      final base64String = base64Encode(bytes);
+      print('Base64 string length: ${base64String.length} characters');
+      
+      // Return just the base64 string (simpler for Firestore)
+      return base64String;
+    } catch (e) {
+      print('Error converting image to base64: $e');
+      rethrow;
+    }
   }
 }
