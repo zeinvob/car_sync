@@ -98,6 +98,8 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
           final bookingData = snapshot.data!.data() as Map<String, dynamic>;
           bookingData['id'] = bookingId;
 
+          final currentStatus = (bookingData['status'] ?? 'requested').toString().toLowerCase();
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -106,6 +108,10 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                 _buildHorizontalProgressTracker(bookingData),
                 const SizedBox(height: 24),
                 _buildStatusTimeline(bookingData, bookingId),
+                if (currentStatus == 'requested') ...[
+                  const SizedBox(height: 24),
+                  _buildCancelButton(bookingId),
+                ],
               ],
             ),
           );
@@ -794,6 +800,110 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
     }
 
     return null;
+  }
+
+  Widget _buildCancelButton(String bookingId) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _showCancelBookingDialog(bookingId),
+        icon: const Icon(Icons.cancel_outlined, size: 18),
+        label: Text(
+          'Cancel Booking',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.red,
+          side: const BorderSide(color: Colors.red),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCancelBookingDialog(String bookingId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Cancel Booking',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Are you sure you want to cancel this booking? This action cannot be undone.',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'No, Keep It',
+              style: GoogleFonts.poppins(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _cancelBooking(bookingId);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Yes, Cancel',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _cancelBooking(String bookingId) async {
+    try {
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'status': 'cancelled',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Booking cancelled successfully',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Go back to previous page
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to cancel booking: $e',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _showChatDialog(BuildContext context, String bookingId) {

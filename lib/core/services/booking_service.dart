@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:car_sync/core/services/notification_service.dart';
 
 /// Service for booking-related Firestore operations
 class BookingService {
@@ -154,6 +155,48 @@ class BookingService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
       print('Booking created with ID: ${docRef.id}');
+
+      // Send notifications to admin and workshop
+      try {
+        // Load workshop info
+        final workshopDoc = await _firestore
+            .collection('workshops')
+            .doc(workshopId)
+            .get();
+        final workshopData = workshopDoc.data() ?? {};
+        final workshopName = (workshopData['name'] ?? 'Workshop').toString();
+
+        // Load customer info
+        final customerDoc = await _firestore
+            .collection('users')
+            .doc(customerId)
+            .get();
+        final customerData = customerDoc.data() ?? {};
+        final customerName =
+            (customerData['name'] ??
+                    customerData['fullName'] ??
+                    customerData['username'] ??
+                    'Customer')
+                .toString();
+
+        // Notify admins
+        await NotificationService.instance.createNewBookingNotificationForAdmins(
+          bookingId: docRef.id,
+          workshopId: workshopId,
+          workshopName: workshopName,
+          customerName: customerName,
+        );
+
+        // Notify workshops
+        await NotificationService.instance.createNewBookingNotificationForWorkshops(
+          bookingId: docRef.id,
+          workshopId: workshopId,
+          customerName: customerName,
+        );
+      } catch (e) {
+        debugPrint('Booking created but notification failed: $e');
+      }
+
       return docRef.id;
     } catch (e) {
       print('createBooking error: $e');

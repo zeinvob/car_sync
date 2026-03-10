@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' show sin, cos, sqrt, atan2, pi;
+import 'package:car_sync/core/services/notification_service.dart';
 
 /// Service for workshop-related Firestore operations
 class WorkshopService {
@@ -198,6 +199,14 @@ class WorkshopService {
     required String newStatus,
     String? technicianId,
   }) async {
+    // Get booking details before updating
+    final bookingDoc = await _firestore
+        .collection('bookings')
+        .doc(bookingId)
+        .get();
+    final bookingData = bookingDoc.data();
+
+    // Update the booking
     await _firestore.collection('bookings').doc(bookingId).update({
       'status': newStatus,
       'assignedTechnicianId':
@@ -206,6 +215,29 @@ class WorkshopService {
           : '',
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // Send notification to customer
+    if (bookingData != null) {
+      final customerId = bookingData['customerId']?.toString() ?? '';
+      final workshopName =
+          bookingData['workshopName']?.toString() ?? 'Workshop';
+
+      // Get technician name if assigned
+      String? technicianName;
+      if (technicianId != null && technicianId.trim().isNotEmpty) {
+        technicianName = await getTechnicianName(technicianId);
+      }
+
+      if (customerId.isNotEmpty) {
+        await NotificationService.instance.createBookingStatusNotificationForCustomer(
+          customerId: customerId,
+          bookingId: bookingId,
+          workshopName: workshopName,
+          newStatus: newStatus,
+          technicianName: technicianName,
+        );
+      }
+    }
   }
 
   /// ADMIN WORKSHOP SERVICE

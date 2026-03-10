@@ -1,5 +1,8 @@
 import 'package:car_sync/core/constants/app_colors.dart';
-import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/core/services/booking_service.dart';
+import 'package:car_sync/core/services/user_service.dart';
+import 'package:car_sync/core/services/sparepart_service.dart';
+import 'package:car_sync/core/services/workshop_service.dart';
 import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +15,7 @@ import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.da
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
+import 'package:car_sync/core/theme/admin_theme_controller.dart';
 import 'dart:async';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -29,7 +33,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _unreadBookingCount = 0;
   StreamSubscription<int>? _notificationCountSubscription;
   StreamSubscription<int>? _bookingCountSubscription;
-  final StorageService _storageService = StorageService();
+  final BookingService _bookingService = BookingService();
+  final UserService _userService = UserService();
+  final SparePartService _sparePartService = SparePartService();
+  final WorkshopService _workshopService = WorkshopService();
   final AuthService _authService = AuthService();
   bool _isSigningOut = false;
   int _selectedIndex = 0;
@@ -42,7 +49,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   void _listenToActiveBookingsCount() {
     _activeBookingsSubscription?.cancel();
 
-    _activeBookingsSubscription = _storageService
+    _activeBookingsSubscription = _bookingService
         .getActiveBookingsCountStream()
         .listen((count) {
           if (mounted) {
@@ -85,7 +92,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final user = FirebaseAuth.instance.currentUser;
 
       if (user != null) {
-        final userData = await _storageService.getUserData(user.uid);
+      final userData = await _userService.getUserData(user.uid);
 
         setState(() {
           _adminName =
@@ -332,11 +339,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             const Divider(height: 1),
 
             // Theme switch
-            ValueListenableBuilder<ThemeMode>(
-              valueListenable: ThemeController.themeMode,
-              builder: (context, mode, _) {
-                final isDark = mode == ThemeMode.dark;
-
+            ValueListenableBuilder<bool>(
+              valueListenable: AdminThemeController.isDark,
+              builder: (context, isDark, _) {
                 return SwitchListTile(
                   title: Text(
                     "Dark mode",
@@ -347,7 +352,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                   value: isDark,
                   onChanged: (val) {
-                    ThemeController.toggleTheme();
+                    AdminThemeController.setTheme(val);
                   },
                 );
               },
@@ -709,7 +714,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   Widget _buildRecentlyAddedSection() {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _storageService.getRecentSpareParts(),
+      future: _sparePartService.getRecentSpareParts(),
       builder: (context, snapshot) {
         final items = snapshot.data ?? [];
 
@@ -749,7 +754,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   Widget _buildWorkshopSection() {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _storageService.getWorkshopList(),
+      future: _workshopService.getWorkshopList(),
       builder: (context, snapshot) {
         final items = snapshot.data ?? [];
 
@@ -1011,7 +1016,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 Align(
                   alignment: Alignment.center,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFF3E0),
                       borderRadius: BorderRadius.circular(08),

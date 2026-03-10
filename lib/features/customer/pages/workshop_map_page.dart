@@ -1,5 +1,5 @@
 import 'package:car_sync/core/constants/app_colors.dart';
-import 'package:car_sync/core/services/storage_service.dart';
+import 'package:car_sync/core/services/workshop_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -14,7 +14,7 @@ class WorkshopMapPage extends StatefulWidget {
 }
 
 class _WorkshopMapPageState extends State<WorkshopMapPage> {
-  final StorageService _storageService = StorageService();
+  final WorkshopService _workshopService = WorkshopService();
   final MapController _mapController = MapController();
   
   List<Map<String, dynamic>> _workshops = [];
@@ -95,7 +95,7 @@ class _WorkshopMapPageState extends State<WorkshopMapPage> {
 
   Future<void> _loadWorkshops() async {
     try {
-      final workshops = await _storageService.getWorkshopList(
+      final workshops = await _workshopService.getWorkshopList(
         userLat: _currentPosition?.latitude,
         userLon: _currentPosition?.longitude,
       );
