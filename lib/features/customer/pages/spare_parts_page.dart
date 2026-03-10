@@ -1,5 +1,7 @@
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/sparepart_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -387,20 +389,165 @@ class _SparePartsPageState extends State<SparePartsPage> {
   }
 }
 
-class _PartDetailsSheet extends StatelessWidget {
+class _PartDetailsSheet extends StatefulWidget {
   final Map<String, dynamic> part;
 
   const _PartDetailsSheet({required this.part});
 
   @override
+  State<_PartDetailsSheet> createState() => _PartDetailsSheetState();
+}
+
+class _PartDetailsSheetState extends State<_PartDetailsSheet> {
+  final TextEditingController _messageController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitEnquiry() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to submit an enquiry'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      // Get user data
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final userData = userDoc.data() ?? {};
+
+      // Create enquiry document
+      await FirebaseFirestore.instance.collection('part_enquiries').add({
+        'partId': widget.part['id'] ?? '',
+        'partName': widget.part['part'] ?? '',
+        'carModel': widget.part['car_model'] ?? '',
+        'price': widget.part['price'] ?? 0,
+        'message': _messageController.text.trim(),
+        'customerId': user.uid,
+        'customerName': userData['fullName'] ?? userData['name'] ?? 'Customer',
+        'customerEmail': user.email ?? '',
+        'customerPhone': userData['phone'] ?? '',
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Enquiry submitted for ${widget.part['part']}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit enquiry: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _showEnquiryDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Enquire About Part',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.part['part'] ?? 'Unknown Part',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _messageController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: 'Add a message (optional)\nE.g., quantity needed, urgency, questions...',
+                hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _isSubmitting
+                ? null
+                : () {
+                    Navigator.pop(context);
+                    _submitEnquiry();
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Submit',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final partName = part['part'] ?? 'Unknown Part';
-    final carModel = part['car_model'] ?? 'Universal';
-    final description = part['description'] ?? 'No description available';
-    final price = part['price'] ?? 0;
-    final stock = part['stock'] ?? 0;
-    final type = part['type'] ?? 'Other';
-    final imageUrl = part['imageUrl'] ?? '';
+    final partName = widget.part['part'] ?? 'Unknown Part';
+    final carModel = widget.part['car_model'] ?? 'Universal';
+    final description = widget.part['description'] ?? 'No description available';
+    final price = widget.part['price'] ?? 0;
+    final stock = widget.part['stock'] ?? 0;
+    final type = widget.part['type'] ?? 'Other';
+    final imageUrl = widget.part['imageUrl'] ?? '';
     final isInStock = stock > 0;
 
     return Container(
@@ -536,19 +683,20 @@ class _PartDetailsSheet extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: isInStock
-                  ? () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Contact workshop to order $partName'),
-                          backgroundColor: AppColors.primary,
-                        ),
-                      );
-                    }
+                  ? () => _showEnquiryDialog()
                   : null,
-              icon: const Icon(Icons.chat_bubble_outline),
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.chat_bubble_outline),
               label: Text(
-                'Enquire Now',
+                _isSubmitting ? 'Submitting...' : 'Enquire Now',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
               ),
               style: ElevatedButton.styleFrom(
