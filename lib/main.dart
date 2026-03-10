@@ -14,6 +14,7 @@ import 'package:car_sync/core/services/auth_nav_flag.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:car_sync/core/services/notification_service.dart';
+import 'package:car_sync/core/theme/admin_theme_controller.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -172,12 +173,67 @@ class RoleBasedHomeLoader extends StatelessWidget {
         final role = snapshot.data;
 
         if (role == 'admin') {
-          return const AdminHomeScreen();
+          return const AdminThemeWrapper(child: AdminHomeScreen());
         } else if (role == 'technician' || role == 'foreman') {
           return const HomeScreen();
         } else {
           return const CustomerHomePage();
         }
+      },
+    );
+  }
+}
+
+class AdminThemeWrapper extends StatelessWidget {
+  final Widget child;
+
+  const AdminThemeWrapper({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: AdminThemeController.isDark,
+      builder: (context, isDark, _) {
+        return Theme(
+          data: isDark
+              ? ThemeData(
+                  brightness: Brightness.dark,
+                  fontFamily: 'Poppins',
+                  primaryColor: AppColors.primary,
+                  scaffoldBackgroundColor: const Color(0xFF0F1115),
+                  cardColor: const Color(0xFF171A21),
+                  colorScheme: const ColorScheme.dark(
+                    primary: AppColors.primary,
+                    secondary: AppColors.gradientEnd,
+                    surface: Color(0xFF171A21),
+                    onSurface: Colors.white,
+                  ),
+                  appBarTheme: const AppBarTheme(
+                    backgroundColor: Color(0xFF171A21),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                  ),
+                )
+              : ThemeData(
+                  brightness: Brightness.light,
+                  fontFamily: 'Poppins',
+                  primaryColor: AppColors.primary,
+                  scaffoldBackgroundColor: const Color(0xFFF3F4F6),
+                  cardColor: Colors.white,
+                  colorScheme: const ColorScheme.light(
+                    primary: AppColors.primary,
+                    secondary: AppColors.gradientEnd,
+                    surface: Colors.white,
+                    onSurface: Color(0xFF1A1A1A),
+                  ),
+                  appBarTheme: const AppBarTheme(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Color(0xFF1A1A1A),
+                    elevation: 0,
+                  ),
+                ),
+          child: child,
+        );
       },
     );
   }

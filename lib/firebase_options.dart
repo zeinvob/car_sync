@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '925167052954',
     projectId: 'carsync-mi',
     authDomain: 'carsync-mi.firebaseapp.com',
+    databaseURL: 'https://carsync-mi-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'carsync-mi.firebasestorage.app',
     measurementId: 'G-1G4G4DBEHQ',
   );
@@ -55,6 +56,7 @@ class DefaultFirebaseOptions {
     appId: '1:925167052954:android:66201f31ea7d5c06905723',
     messagingSenderId: '925167052954',
     projectId: 'carsync-mi',
+    databaseURL: 'https://carsync-mi-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'carsync-mi.firebasestorage.app',
   );
 
@@ -63,7 +65,9 @@ class DefaultFirebaseOptions {
     appId: '1:925167052954:ios:120422eab0bd7096905723',
     messagingSenderId: '925167052954',
     projectId: 'carsync-mi',
+    databaseURL: 'https://carsync-mi-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'carsync-mi.firebasestorage.app',
+    androidClientId: '925167052954-668rdebt40ifuhm8f78bpkg778c8kpsa.apps.googleusercontent.com',
     iosClientId: '925167052954-pugptg2sg2k3e88bhkq04ht13aeij09p.apps.googleusercontent.com',
     iosBundleId: 'com.example.carSync',
   );
@@ -73,7 +77,9 @@ class DefaultFirebaseOptions {
     appId: '1:925167052954:ios:120422eab0bd7096905723',
     messagingSenderId: '925167052954',
     projectId: 'carsync-mi',
+    databaseURL: 'https://carsync-mi-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'carsync-mi.firebasestorage.app',
+    androidClientId: '925167052954-668rdebt40ifuhm8f78bpkg778c8kpsa.apps.googleusercontent.com',
     iosClientId: '925167052954-pugptg2sg2k3e88bhkq04ht13aeij09p.apps.googleusercontent.com',
     iosBundleId: 'com.example.carSync',
   );
@@ -84,6 +90,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '925167052954',
     projectId: 'carsync-mi',
     authDomain: 'carsync-mi.firebaseapp.com',
+    databaseURL: 'https://carsync-mi-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'carsync-mi.firebasestorage.app',
     measurementId: 'G-7X25NEY197',
   );

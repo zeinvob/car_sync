@@ -157,20 +157,39 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     }
   }
 
-  Future<void> _pickAndSendImage(String bookingId) async {
+Future<void> _pickAndSendImage(String bookingId) async {
+  try {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not logged in')),
+        );
+      }
+      return;
+    }
 
     final file = await _imagePickerService.pickFromGallery();
-    if (file == null) return;
+    if (file == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No image selected')),
+        );
+      }
+      return;
+    }
 
     final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    debugPrint('Picked image path: ${file.path}');
 
     final imageUrl = await _fileUploadService.uploadChatImage(
       file: file,
       bookingId: bookingId,
       fileName: fileName,
     );
+
+    debugPrint('Uploaded image URL: $imageUrl');
 
     await _chatService.sendImageMessage(
       bookingId: bookingId,
@@ -179,8 +198,21 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
       senderRole: 'workshop',
       imageUrl: imageUrl,
     );
-  }
 
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image sent successfully')),
+      );
+    }
+  } catch (e) {
+    debugPrint('Send image error: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send image: $e')),
+      );
+    }
+  }
+}
   Future<void> _pickAndSendDocument(String bookingId) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
