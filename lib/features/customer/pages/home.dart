@@ -9,6 +9,8 @@ import 'package:car_sync/features/customer/pages/add_vehicle_page.dart';
 import 'package:car_sync/features/customer/pages/book_service_page.dart';
 import 'package:car_sync/features/customer/pages/booking_details_page.dart';
 import 'package:car_sync/features/customer/pages/customer_notifications_page.dart';
+import 'package:car_sync/features/customer/pages/edit_profile_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -141,8 +143,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               _buildQuickActions(),
               const SizedBox(height: 24),
 
-              // Active Booking Status
-              _buildSectionTitle('Active Booking'),
+              // Upcoming Booking Status
+              _buildSectionTitle('Upcoming Booking'),
               const SizedBox(height: 12),
               _buildActiveBookingCard(),
               const SizedBox(height: 24),
@@ -404,6 +406,23 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
+  String _formatBookingDate(dynamic date) {
+    if (date == null) return 'N/A';
+    try {
+      DateTime dateTime;
+      if (date is Timestamp) {
+        dateTime = date.toDate();
+      } else if (date is String) {
+        dateTime = DateTime.parse(date);
+      } else {
+        return 'N/A';
+      }
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
   Widget _buildActiveBookingCard() {
     // If no active booking, show placeholder
     if (_activeBookings.isEmpty) {
@@ -430,7 +449,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No Active Booking',
+              'No Upcoming Booking',
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -494,7 +513,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                booking['serviceName'] ?? 'Service',
+                booking['serviceType'] ?? 'Service',
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -526,9 +545,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             children: [
               const Icon(Icons.directions_car, color: Colors.white70, size: 18),
               const SizedBox(width: 8),
-              Text(
-                booking['carPlate'] ?? 'N/A',
-                style: GoogleFonts.poppins(color: Colors.white70),
+              Expanded(
+                child: Text(
+                  booking['vehicleDisplay'] ?? 'N/A',
+                  style: GoogleFonts.poppins(color: Colors.white70),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -538,7 +560,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               const Icon(Icons.calendar_today, color: Colors.white70, size: 18),
               const SizedBox(width: 8),
               Text(
-                booking['date'] ?? 'N/A',
+                _formatBookingDate(booking['bookingDate']),
                 style: GoogleFonts.poppins(color: Colors.white70),
               ),
             ],
@@ -1254,10 +1276,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             _buildProfileOption(
               icon: Icons.person_outline,
               title: 'Edit Profile',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Edit Profile coming soon!')),
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EditProfilePage()),
                 );
+                if (result == true) {
+                  _loadUserData(); // Refresh user data after edit
+                }
               },
             ),
             _buildProfileOption(
