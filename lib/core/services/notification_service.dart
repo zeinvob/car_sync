@@ -201,10 +201,6 @@ class NotificationService {
     required String newStatus,
     String? technicianName,
   }) async {
-    print('=== createBookingStatusNotificationForCustomer ===');
-    print('customerId: $customerId, bookingId: $bookingId');
-    print('workshopName: $workshopName, newStatus: $newStatus');
-    
     String title;
     String body;
 
@@ -234,8 +230,6 @@ class NotificationService {
             'Your booking status at $workshopName has been updated to $newStatus.';
     }
 
-    print('Creating notification - title: $title, body: $body');
-    
     await createNotification(
       targetUserId: customerId,
       type: 'booking_status_update',
@@ -249,8 +243,6 @@ class NotificationService {
         if (technicianName != null) 'technicianName': technicianName,
       },
     );
-    
-    print('Notification document created in Firestore');
   }
 
   /// Create a notification for customer when technician adds a repair update
@@ -282,15 +274,28 @@ class NotificationService {
   Stream<List<Map<String, dynamic>>> userNotificationsStream({
     required String userId,
   }) {
+    // Note: This query requires a composite index on (targetUserId, createdAt)
+    // If index is not ready, we fall back to client-side sorting
     return _notificationsCollection
         .where('targetUserId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) {
+          final list = snapshot.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             return {'id': doc.id, ...data};
           }).toList();
+          
+          // Sort by createdAt on client side
+          list.sort((a, b) {
+            final aTime = a['createdAt'] as Timestamp?;
+            final bTime = b['createdAt'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime); // Descending
+          });
+          
+          return list;
         });
   }
 

@@ -199,16 +199,12 @@ class WorkshopService {
     required String newStatus,
     String? technicianId,
   }) async {
-    print('=== updateBookingStatusAndTechnician called ===');
-    print('bookingId: $bookingId, newStatus: $newStatus');
-    
     // Get booking details before updating
     final bookingDoc = await _firestore
         .collection('bookings')
         .doc(bookingId)
         .get();
     final bookingData = bookingDoc.data();
-    print('bookingData: $bookingData');
 
     // Update the booking
     await _firestore.collection('bookings').doc(bookingId).update({
@@ -219,15 +215,12 @@ class WorkshopService {
           : '',
       'updatedAt': FieldValue.serverTimestamp(),
     });
-    print('Booking status updated in Firestore');
 
     // Send notification to customer
     if (bookingData != null) {
       final customerId = bookingData['customerId']?.toString() ?? '';
       final workshopName =
           bookingData['workshopName']?.toString() ?? 'Workshop';
-      
-      print('customerId: $customerId, workshopName: $workshopName');
 
       // Get technician name if assigned
       String? technicianName;
@@ -236,7 +229,6 @@ class WorkshopService {
       }
 
       if (customerId.isNotEmpty) {
-        print('Creating notification for customer...');
         await NotificationService.instance.createBookingStatusNotificationForCustomer(
           customerId: customerId,
           bookingId: bookingId,
@@ -244,12 +236,7 @@ class WorkshopService {
           newStatus: newStatus,
           technicianName: technicianName,
         );
-        print('Notification created successfully');
-      } else {
-        print('ERROR: customerId is empty, cannot create notification');
       }
-    } else {
-      print('ERROR: bookingData is null');
     }
   }
 
