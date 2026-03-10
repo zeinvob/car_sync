@@ -162,6 +162,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               _buildHeader(),
               const SizedBox(height: 24),
 
+              // Latest News & Updates Banner
+              _buildSectionTitle('Latest Updates'),
+              const SizedBox(height: 12),
+              _buildNewsBanner(),
+              const SizedBox(height: 24),
+
               // Quick Actions
               _buildSectionTitle('Quick Actions'),
               const SizedBox(height: 12),
@@ -172,12 +178,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               _buildSectionTitle('Upcoming Booking'),
               const SizedBox(height: 12),
               _buildActiveBookingCard(),
-              const SizedBox(height: 24),
-
-              // Recent Services
-              _buildSectionTitle('Recent Services'),
-              const SizedBox(height: 12),
-              _buildRecentServices(),
             ],
           ),
         ),
@@ -320,75 +320,57 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Widget _buildQuickActions() {
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.calendar_month_outlined,
-                label: 'Book Service',
-                color: AppColors.primary,
-                onTap: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const BookServicePage()),
-                  );
-                  if (result == true) {
-                    _loadUserData(); // Refresh bookings
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.history,
-                label: 'History',
-                color: AppColors.gradientEnd,
-                onTap: () {
-                  setState(() => _currentIndex = 1);
-                },
-              ),
-            ),
-          ],
+        _buildQuickActionItem(
+          icon: Icons.calendar_month_outlined,
+          label: 'Book',
+          color: AppColors.primary,
+          onTap: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BookServicePage()),
+            );
+            if (result == true) {
+              _loadUserData();
+            }
+          },
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.directions_car_outlined,
-                label: 'My Cars',
-                color: Colors.orange,
-                onTap: () {
-                  setState(() => _currentIndex = 2);
-                },
+        _buildQuickActionItem(
+          icon: Icons.history,
+          label: 'History',
+          color: AppColors.gradientEnd,
+          onTap: () {
+            setState(() => _currentIndex = 1);
+          },
+        ),
+        _buildQuickActionItem(
+          icon: Icons.directions_car_outlined,
+          label: 'My Cars',
+          color: Colors.orange,
+          onTap: () {
+            setState(() => _currentIndex = 2);
+          },
+        ),
+        _buildQuickActionItem(
+          icon: Icons.build_outlined,
+          label: 'Spare Parts',
+          color: Colors.teal,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const SparePartsPage(),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.build_outlined,
-                label: 'Spare Parts',
-                color: Colors.teal,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SparePartsPage(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _buildActionCard({
+  Widget _buildQuickActionItem({
     required IconData icon,
     required String label,
     required Color color,
@@ -396,42 +378,27 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(14),
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 26),
+            child: Icon(icon, color: color, size: 26),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -600,42 +567,135 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  Widget _buildRecentServices() {
-    // Placeholder recent services
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+  int _currentNewsIndex = 0;
+
+  Widget _buildNewsBanner() {
+    final List<Map<String, dynamic>> newsItems = [
+      {
+        'title': 'Free Car Check-up',
+        'description': 'Get a complimentary 20-point inspection with any service booking this month!',
+        'icon': Icons.local_offer_outlined,
+        'color': const Color(0xFF4CAF50),
+      },
+      {
+        'title': 'New Workshop Partner',
+        'description': 'We\'ve partnered with Premium Auto Care - now available in your area.',
+        'icon': Icons.handshake_outlined,
+        'color': const Color(0xFF2196F3),
+      },
+      {
+        'title': 'Spare Parts Sale',
+        'description': 'Up to 20% off on selected spare parts. Check out our catalogue!',
+        'icon': Icons.discount_outlined,
+        'color': const Color(0xFFFF9800),
+      },
+    ];
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 160,
+          child: PageView.builder(
+            itemCount: newsItems.length,
+            controller: PageController(viewportFraction: 0.95),
+            onPageChanged: (index) {
+              setState(() {
+                _currentNewsIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              final news = newsItems[index];
+              return Container(
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      (news['color'] as Color).withOpacity(0.9),
+                      (news['color'] as Color).withOpacity(0.7),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (news['color'] as Color).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              news['title'] as String,
+                              style: GoogleFonts.poppins(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              news['description'] as String,
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.9),
+                                height: 1.4,
+                              ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          news['icon'] as IconData,
+                          size: 36,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.history_outlined, size: 48, color: Colors.grey[400]),
-          const SizedBox(height: 12),
-          Text(
-            'No Service History',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600],
+        ),
+        const SizedBox(height: 12),
+        // Page indicator dots
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            newsItems.length,
+            (index) => Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: _currentNewsIndex == index ? 24 : 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _currentNewsIndex == index
+                    ? AppColors.primary
+                    : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Your completed services will appear here',
-            style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[500]),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
