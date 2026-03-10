@@ -274,15 +274,28 @@ class NotificationService {
   Stream<List<Map<String, dynamic>>> userNotificationsStream({
     required String userId,
   }) {
+    // Note: This query requires a composite index on (targetUserId, createdAt)
+    // If index is not ready, we fall back to client-side sorting
     return _notificationsCollection
         .where('targetUserId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) {
+          final list = snapshot.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             return {'id': doc.id, ...data};
           }).toList();
+          
+          // Sort by createdAt on client side
+          list.sort((a, b) {
+            final aTime = a['createdAt'] as Timestamp?;
+            final bTime = b['createdAt'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime); // Descending
+          });
+          
+          return list;
         });
   }
 
@@ -421,6 +434,62 @@ class NotificationService {
       await batch.commit();
     } catch (e) {
       debugPrint('Error marking role notifications as read: $e');
+    }
+  }
+
+  // ======================== DELETE NOTIFICATIONS ========================
+
+  /// Delete a single notification by ID
+  Future<void> deleteNotification(String notificationId) async {
+    try {
+      await _notificationsCollection.doc(notificationId).delete();
+      debugPrint('Notification deleted: $notificationId');
+    } catch (e) {
+      debugPrint('Error deleting notification: $e');
+    }
+  }
+
+  /// Delete all notifications for a specific user
+  Future<void> deleteAllUserNotifications(String userId) async {
+    try {
+      final snapshot = await _notificationsCollection
+          .where('targetUserId', isEqualTo: userId)
+          .get();
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      debugPrint('Deleted ${snapshot.docs.length} notifications for user: $userId');
+    } catch (e) {
+      debugPrint('Error deleting user notifications: $e');
+    }
+  }
+
+  /// Delete all read notifications for a specific user
+  Future<void> deleteReadNotifications(String userId) async {
+    try {
+      final snapshot = await _notificationsCollection
+          .where('targetUserId', isEqualTo: userId)
+          .get();
+
+      final batch = _firestore.batch();
+      int deletedCount = 0;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        final isReadBy = data?['isReadBy'] as List<dynamic>? ?? [];
+        if (isReadBy.contains(userId)) {
+          batch.delete(doc.reference);
+          deletedCount++;
+        }
+      }
+
+      await batch.commit();
+      debugPrint('Deleted $deletedCount read notifications for user: $userId');
+    } catch (e) {
+      debugPrint('Error deleting read notifications: $e');
     }
   }
 }

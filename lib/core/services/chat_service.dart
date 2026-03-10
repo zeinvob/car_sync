@@ -17,6 +17,22 @@ class ChatService {
         .snapshots();
   }
 
+  Map<String, dynamic> _readFlagsForRole(String senderRole) {
+    final role = senderRole.trim().toLowerCase();
+
+    if (role == 'customer') {
+      return {
+        'isReadByAdmin': false,
+        'isReadByCustomer': true,
+      };
+    }
+
+    return {
+      'isReadByAdmin': true,
+      'isReadByCustomer': false,
+    };
+  }
+
   /// Send plain text message
   Future<void> sendTextMessage({
     required String bookingId,
@@ -36,6 +52,7 @@ class ChatService {
           'senderName': senderName,
           'senderRole': senderRole,
           'createdAt': FieldValue.serverTimestamp(),
+          ..._readFlagsForRole(senderRole),
         });
   }
 
@@ -60,6 +77,7 @@ class ChatService {
           'senderName': senderName,
           'senderRole': senderRole,
           'createdAt': FieldValue.serverTimestamp(),
+          ..._readFlagsForRole(senderRole),
         });
   }
 
@@ -88,11 +106,11 @@ class ChatService {
           'senderName': senderName,
           'senderRole': senderRole,
           'createdAt': FieldValue.serverTimestamp(),
+          ..._readFlagsForRole(senderRole),
         });
   }
 
   /// Send location message
-
   Future<void> sendLocationMessage({
     required String bookingId,
     required String senderId,
@@ -111,10 +129,52 @@ class ChatService {
           'text': label,
           'latitude': latitude,
           'longitude': longitude,
+          'mapUrl':
+              'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
           'senderId': senderId,
           'senderName': senderName,
           'senderRole': senderRole,
           'createdAt': FieldValue.serverTimestamp(),
+          ..._readFlagsForRole(senderRole),
         });
+  }
+
+  Future<void> markMessagesReadByAdmin(String bookingId) async {
+    final snapshot = await _firestore
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('messages')
+        .where('senderRole', isEqualTo: 'customer')
+        .where('isReadByAdmin', isEqualTo: false)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      await doc.reference.update({'isReadByAdmin': true});
+    }
+  }
+
+  Future<int> getUnreadCountForAdmin(String bookingId) async {
+    final snapshot = await _firestore
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('messages')
+        .where('senderRole', isEqualTo: 'customer')
+        .where('isReadByAdmin', isEqualTo: false)
+        .get();
+
+    return snapshot.docs.length;
+  }
+
+  Future<Map<String, dynamic>?> getLastMessage(String bookingId) async {
+    final snapshot = await _firestore
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('messages')
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+    return snapshot.docs.first.data();
   }
 }

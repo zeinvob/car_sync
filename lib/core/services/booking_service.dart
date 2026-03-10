@@ -153,6 +153,7 @@ class BookingService {
         'status': 'requested',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'statusHistory': {'requested': FieldValue.serverTimestamp()},
       });
       print('Booking created with ID: ${docRef.id}');
 
@@ -180,19 +181,21 @@ class BookingService {
                 .toString();
 
         // Notify admins
-        await NotificationService.instance.createNewBookingNotificationForAdmins(
-          bookingId: docRef.id,
-          workshopId: workshopId,
-          workshopName: workshopName,
-          customerName: customerName,
-        );
+        await NotificationService.instance
+            .createNewBookingNotificationForAdmins(
+              bookingId: docRef.id,
+              workshopId: workshopId,
+              workshopName: workshopName,
+              customerName: customerName,
+            );
 
         // Notify workshops
-        await NotificationService.instance.createNewBookingNotificationForWorkshops(
-          bookingId: docRef.id,
-          workshopId: workshopId,
-          customerName: customerName,
-        );
+        await NotificationService.instance
+            .createNewBookingNotificationForWorkshops(
+              bookingId: docRef.id,
+              workshopId: workshopId,
+              customerName: customerName,
+            );
       } catch (e) {
         debugPrint('Booking created but notification failed: $e');
       }
@@ -282,6 +285,7 @@ class BookingService {
           'notes': data['notes'] ?? '',
           'createdAt': data['createdAt'],
           'updatedAt': data['updatedAt'],
+          'statusHistory': data['statusHistory'] ?? {},
         });
       }
 
@@ -393,6 +397,7 @@ class BookingService {
           'notes': data['notes'] ?? '',
           'createdAt': data['createdAt'],
           'updatedAt': data['updatedAt'],
+          'statusHistory': data['statusHistory'] ?? {},
         });
       }
 
@@ -426,10 +431,23 @@ class BookingService {
     required String newStatus,
   }) async {
     try {
-      await _firestore.collection('bookings').doc(bookingId).update({
+      final docRef = _firestore.collection('bookings').doc(bookingId);
+      final doc = await docRef.get();
+      final data = doc.data() ?? {};
+      final statusHistory = Map<String, dynamic>.from(
+        data['statusHistory'] ?? {},
+      );
+
+      final updateData = {
         'status': newStatus,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (!statusHistory.containsKey(newStatus)) {
+        updateData['statusHistory.$newStatus'] = FieldValue.serverTimestamp();
+      }
+
+      await docRef.update(updateData);
     } catch (e) {
       print('updateBookingStatus error: $e');
     }

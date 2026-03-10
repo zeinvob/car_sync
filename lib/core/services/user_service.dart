@@ -200,6 +200,7 @@ class UserService {
     String? fullName,
     String? phone,
     DateTime? dateOfBirth,
+    String? profileImageUrl,
   }) async {
     try {
       Map<String, dynamic> updates = {
@@ -210,6 +211,7 @@ class UserService {
       if (dateOfBirth != null) {
         updates['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
       }
+      if (profileImageUrl != null) updates['profileImageUrl'] = profileImageUrl;
 
       await _usersCollection.doc(uid).update(updates);
       print("User data updated for UID: $uid");
