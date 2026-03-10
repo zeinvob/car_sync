@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/services/user_service.dart';
 import 'package:car_sync/core/services/booking_service.dart';
@@ -10,6 +12,7 @@ import 'package:car_sync/features/customer/pages/book_service_page.dart';
 import 'package:car_sync/features/customer/pages/booking_details_page.dart';
 import 'package:car_sync/features/customer/pages/customer_notifications_page.dart';
 import 'package:car_sync/features/customer/pages/edit_profile_page.dart';
+import 'package:car_sync/features/customer/pages/spare_parts_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -36,6 +39,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   // User data
   String _userName = '';
   String _userEmail = '';
+  String? _profileImageUrl;
   List<Map<String, dynamic>> _activeBookings = [];
   List<Map<String, dynamic>> _vehicles = [];
 
@@ -62,6 +66,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               user.displayName ??
               'Customer';
           _userEmail = userData?['email'] ?? user.email ?? '';
+          _profileImageUrl = userData?['profileImageUrl'];
         });
 
         // Load active bookings for this customer
@@ -120,6 +125,23 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
       bottomNavigationBar: _buildBottomNavBar(),
     );
+  }
+
+  /// Get image provider from base64 string or URL
+  ImageProvider? _getProfileImageProvider() {
+    if (_profileImageUrl == null) return null;
+
+    if (_profileImageUrl!.startsWith('data:image')) {
+      // Base64 data URI format
+      final base64String = _profileImageUrl!.split(',').last;
+      return MemoryImage(base64Decode(base64String));
+    } else if (_profileImageUrl!.startsWith('http')) {
+      // Regular URL
+      return NetworkImage(_profileImageUrl!);
+    } else {
+      // Plain base64 string
+      return MemoryImage(base64Decode(_profileImageUrl!));
+    }
   }
 
   /// ============ HOME TAB ============
@@ -343,10 +365,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 label: 'Spare Parts',
                 color: Colors.teal,
                 onTap: () {
-                  // TODO: Navigate to spare parts page
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Browse Spare Parts coming soon!'),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SparePartsPage(),
                     ),
                   );
                 },
@@ -1225,6 +1247,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   /// ============ PROFILE TAB ============
   Widget _buildProfilePage() {
+    final imageProvider = _getProfileImageProvider();
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -1237,23 +1261,33 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                gradient: imageProvider == null
+                    ? const LinearGradient(
+                        colors: [
+                          AppColors.gradientStart,
+                          AppColors.gradientEnd,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
                 borderRadius: BorderRadius.circular(50),
+                image: imageProvider != null
+                    ? DecorationImage(image: imageProvider, fit: BoxFit.cover)
+                    : null,
               ),
-              child: Center(
-                child: Text(
-                  _userName.isNotEmpty ? _userName[0].toUpperCase() : 'C',
-                  style: GoogleFonts.poppins(
-                    fontSize: 40,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              child: imageProvider == null
+                  ? Center(
+                      child: Text(
+                        _userName.isNotEmpty ? _userName[0].toUpperCase() : 'C',
+                        style: GoogleFonts.poppins(
+                          fontSize: 40,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(height: 16),
 
