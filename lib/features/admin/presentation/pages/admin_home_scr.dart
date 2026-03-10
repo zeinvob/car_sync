@@ -15,6 +15,7 @@ import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.da
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
+import 'package:car_sync/core/theme/admin_theme_controller.dart';
 import 'dart:async';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -338,11 +339,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             const Divider(height: 1),
 
             // Theme switch
-            ValueListenableBuilder<ThemeMode>(
-              valueListenable: ThemeController.themeMode,
-              builder: (context, mode, _) {
-                final isDark = mode == ThemeMode.dark;
-
+            ValueListenableBuilder<bool>(
+              valueListenable: AdminThemeController.isDark,
+              builder: (context, isDark, _) {
                 return SwitchListTile(
                   title: Text(
                     "Dark mode",
@@ -353,7 +352,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                   value: isDark,
                   onChanged: (val) {
-                    ThemeController.toggleTheme();
+                    AdminThemeController.setTheme(val);
                   },
                 );
               },
@@ -1017,7 +1016,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 Align(
                   alignment: Alignment.center,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFF3E0),
                       borderRadius: BorderRadius.circular(08),
