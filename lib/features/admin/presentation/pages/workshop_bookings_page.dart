@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:map_launcher/map_launcher.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/chat_service.dart';
@@ -32,6 +33,7 @@ class WorkshopBookingsPage extends StatefulWidget {
   @override
   State<WorkshopBookingsPage> createState() => _WorkshopBookingsPageState();
 }
+
 //
 class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
   final WorkshopService _workshopService = WorkshopService();
@@ -157,62 +159,53 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     }
   }
 
-Future<void> _pickAndSendImage(String bookingId) async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+  Future<void> _pickAndSendImage(String bookingId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('User not logged in')));
+        }
+        return;
+      }
+
+      final file = await _imagePickerService.pickFromGallery();
+      if (file == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('No image selected')));
+        }
+        return;
+      }
+
+      final imageBase64 = await _fileUploadService.imageToBase64(file);
+
+      await _chatService.sendImageMessage(
+        bookingId: bookingId,
+        senderId: user.uid,
+        senderName: widget.workshopName,
+        senderRole: 'workshop',
+        imageUrl: imageBase64,
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User not logged in')),
+          const SnackBar(content: Text('Image sent successfully')),
         );
       }
-      return;
-    }
-
-    final file = await _imagePickerService.pickFromGallery();
-    if (file == null) {
+    } catch (e) {
+      debugPrint('Send image error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No image selected')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to send image: $e')));
       }
-      return;
-    }
-
-    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-    debugPrint('Picked image path: ${file.path}');
-
-    final imageUrl = await _fileUploadService.uploadChatImage(
-      file: file,
-      bookingId: bookingId,
-      fileName: fileName,
-    );
-
-    debugPrint('Uploaded image URL: $imageUrl');
-
-    await _chatService.sendImageMessage(
-      bookingId: bookingId,
-      senderId: user.uid,
-      senderName: widget.workshopName,
-      senderRole: 'workshop',
-      imageUrl: imageUrl,
-    );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image sent successfully')),
-      );
-    }
-  } catch (e) {
-    debugPrint('Send image error: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send image: $e')),
-      );
     }
   }
-}
+
   Future<void> _pickAndSendDocument(String bookingId) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -671,53 +664,110 @@ Future<void> _pickAndSendImage(String bookingId) async {
                                         if ((data['imageUrl'] ?? '')
                                             .toString()
                                             .isNotEmpty)
-                                          GestureDetector(
-                                            onTap: () {
-                                              showDialog(
-                                                context: context,
-                                                builder: (_) => Dialog(
-                                                  backgroundColor:
-                                                      Colors.transparent,
-                                                  child: Stack(
-                                                    children: [
-                                                      InteractiveViewer(
-                                                        child: Image.network(
-                                                          data['imageUrl']
-                                                              .toString(),
-                                                          fit: BoxFit.contain,
+                                          Builder(
+                                            builder: (context) {
+                                              final imageData =
+                                                  (data['imageUrl'] ?? '')
+                                                      .toString()
+                                                      .trim();
+
+                                              Widget previewImage;
+                                              Widget fullImage;
+
+                                              try {
+                                                final decodedBytes =
+                                                    base64Decode(imageData);
+
+                                                previewImage = Image.memory(
+                                                  decodedBytes,
+                                                  width: 170,
+                                                  height: 125,
+                                                  fit: BoxFit.cover,
+                                                );
+
+                                                fullImage = Image.memory(
+                                                  decodedBytes,
+                                                  fit: BoxFit.contain,
+                                                );
+                                              } catch (e) {
+                                                previewImage = Container(
+                                                  width: 170,
+                                                  height: 125,
+                                                  alignment: Alignment.center,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey.shade300,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
                                                         ),
-                                                      ),
-                                                      Positioned(
-                                                        top: 10,
-                                                        right: 10,
-                                                        child: IconButton(
-                                                          onPressed: () =>
-                                                              Navigator.pop(
-                                                                context,
-                                                              ),
-                                                          icon: const Icon(
-                                                            Icons.close,
-                                                            color: Colors.white,
-                                                            size: 30,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
                                                   ),
+                                                  child: const Icon(
+                                                    Icons.broken_image_outlined,
+                                                  ),
+                                                );
+
+                                                fullImage = const Center(
+                                                  child: Icon(
+                                                    Icons.broken_image_outlined,
+                                                    color: Colors.white,
+                                                    size: 40,
+                                                  ),
+                                                );
+                                              }
+
+                                              return GestureDetector(
+                                                onTap: () {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (_) => Dialog(
+                                                      backgroundColor:
+                                                          Colors.transparent,
+                                                      child: Stack(
+                                                        children: [
+                                                          InteractiveViewer(
+                                                            child: fullImage,
+                                                          ),
+                                                          Positioned(
+                                                            top: 10,
+                                                            right: 10,
+                                                            child: IconButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                    context,
+                                                                  ),
+                                                              icon: const Icon(
+                                                                Icons.close,
+                                                                color: Colors
+                                                                    .white,
+                                                                size: 30,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                  child: previewImage,
                                                 ),
                                               );
                                             },
-                                            child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              child: Image.network(
-                                                data['imageUrl'].toString(),
-                                                width: 170,
-                                                height: 125,
-                                                fit: BoxFit.cover,
-                                              ),
+                                          ),
+                                        if (messageText.isNotEmpty) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            messageText,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 12,
+                                              color: isMe
+                                                  ? Colors.white
+                                                  : onSurface,
                                             ),
                                           ),
+                                        ],
                                         if (messageText.isNotEmpty) ...[
                                           const SizedBox(height: 6),
                                           Text(

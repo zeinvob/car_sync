@@ -331,25 +331,12 @@ class WorkshopService {
   /// -------------------------------------------------------------------------- ADMIN WORKSHOP SERVICE
   ///
   Stream<int> unreadCustomerMessagesCountStream() {
-    return _firestore.collection('bookings').snapshots().asyncMap((
-      snapshot,
-    ) async {
-      int totalUnread = 0;
-
-      for (final bookingDoc in snapshot.docs) {
-        final messagesSnapshot = await _firestore
-            .collection('bookings')
-            .doc(bookingDoc.id)
-            .collection('messages')
-            .where('senderRole', isEqualTo: 'customer')
-            .where('isReadByAdmin', isEqualTo: false)
-            .get();
-
-        totalUnread += messagesSnapshot.docs.length;
-      }
-
-      return totalUnread;
-    });
+    return _firestore
+        .collectionGroup('messages')
+        .where('senderRole', isEqualTo: 'customer')
+        .where('isReadByAdmin', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
   }
 
   Future<List<Map<String, dynamic>>> getAllActiveBookingsForChat() async {
@@ -443,4 +430,31 @@ class WorkshopService {
 
     return bookingsWithCustomer;
   }
+
+
+
+  Future<int> getUnreadCustomerMessagesCountOnce() async {
+  int totalUnread = 0;
+
+  final snapshot = await _firestore.collection('bookings').get();
+
+  for (final bookingDoc in snapshot.docs) {
+    final data = bookingDoc.data();
+    final status = (data['status'] ?? '').toString().toLowerCase();
+
+    if (status == 'completed' || status == 'cancelled') continue;
+
+    final messagesSnapshot = await _firestore
+        .collection('bookings')
+        .doc(bookingDoc.id)
+        .collection('messages')
+        .where('senderRole', isEqualTo: 'customer')
+        .where('isReadByAdmin', isEqualTo: false)
+        .get();
+
+    totalUnread += messagesSnapshot.docs.length;
+  }
+
+  return totalUnread;
+}
 }

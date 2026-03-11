@@ -1,24 +1,25 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:car_sync/core/constants/app_colors.dart';
+import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/services/booking_service.dart';
-import 'package:car_sync/core/services/user_service.dart';
+import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/services/sparepart_service.dart';
+import 'package:car_sync/core/services/user_service.dart';
 import 'package:car_sync/core/services/workshop_service.dart';
+import 'package:car_sync/core/theme/admin_theme_controller.dart';
+import 'package:car_sync/core/widgets/gradient_button.dart';
+import 'package:car_sync/features/admin/presentation/pages/admin_chat_inbox_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/admin_workshops_browser_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
+import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:car_sync/core/widgets/gradient_button.dart';
-import 'package:car_sync/core/services/auth_service.dart';
-import 'package:car_sync/features/auth/pages/login_form_page.dart';
-import 'package:car_sync/core/theme/theme_controller.dart';
-import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:car_sync/core/services/notification_service.dart';
-import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
-import 'package:car_sync/core/theme/admin_theme_controller.dart';
-import 'package:car_sync/features/admin/presentation/pages/admin_chat_inbox_page.dart';
-import 'package:car_sync/features/admin/presentation/pages/admin_workshops_browser_page.dart';
-import 'dart:async';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -27,42 +28,35 @@ class AdminHomeScreen extends StatefulWidget {
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
 }
 
-class _AdminHomeScreenState extends State<AdminHomeScreen> {
+class _AdminHomeScreenState extends State<AdminHomeScreen>
+    with WidgetsBindingObserver {
   final NotificationService _notificationService = NotificationService.instance;
-  int _activeBookingsCount = 0;
-  StreamSubscription<int>? _activeBookingsSubscription;
-  int _unreadNotificationCount = 0;
-  int _unreadBookingCount = 0;
-  StreamSubscription<int>? _notificationCountSubscription;
-  StreamSubscription<int>? _bookingCountSubscription;
   final BookingService _bookingService = BookingService();
   final UserService _userService = UserService();
   final SparePartService _sparePartService = SparePartService();
   final WorkshopService _workshopService = WorkshopService();
   final AuthService _authService = AuthService();
-  bool _isSigningOut = false;
-  int _selectedIndex = 0;
-  String _adminName = 'Admin';
-  String _adminEmail = '';
-  bool _isLoadingAdmin = true;
+
+  int _activeBookingsCount = 0;
+  int _unreadNotificationCount = 0;
+  int _unreadBookingCount = 0;
   int _unreadChatCount = 0;
+
+  StreamSubscription<int>? _activeBookingsSubscription;
+  StreamSubscription<int>? _notificationCountSubscription;
+  StreamSubscription<int>? _bookingCountSubscription;
   StreamSubscription<int>? _chatCountSubscription;
 
+  bool _isSigningOut = false;
+  bool _isLoadingAdmin = true;
+  int _selectedIndex = 0;
+
+  String _adminName = 'Admin';
+  String _adminEmail = '';
+  String _adminProfileImageUrl = '';
+  Timer? _chatRefreshTimer;
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  void _listenToActiveBookingsCount() {
-    _activeBookingsSubscription?.cancel();
-
-    _activeBookingsSubscription = _bookingService
-        .getActiveBookingsCountStream()
-        .listen((count) {
-          if (mounted) {
-            setState(() {
-              _activeBookingsCount = count;
-            });
-          }
-        });
-  }
 
   @override
   void initState() {
@@ -70,6 +64,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     _listenToNotificationCounts();
     _listenToActiveBookingsCount();
     _listenToUnreadChatCount();
+    _startChatCountAutoRefresh();
 
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -88,17 +83,117 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     _bookingCountSubscription?.cancel();
     _activeBookingsSubscription?.cancel();
     _chatCountSubscription?.cancel();
+    _chatRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _listenToUnreadChatCount();
+    }
+  }
+
+  void _listenToActiveBookingsCount() {
+    _activeBookingsSubscription?.cancel();
+
+    _activeBookingsSubscription = _bookingService
+        .getActiveBookingsCountStream()
+        .listen((count) {
+          if (mounted) {
+            setState(() {
+              _activeBookingsCount = count;
+            });
+          }
+        });
+  }
+
+  void _listenToNotificationCounts() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _notificationCountSubscription?.cancel();
+    _bookingCountSubscription?.cancel();
+
+    _notificationCountSubscription = _notificationService
+        .unreadNotificationCountStream(role: 'admin', currentUserId: user.uid)
+        .listen((count) {
+          if (mounted) {
+            setState(() {
+              _unreadNotificationCount = count;
+            });
+          }
+        });
+
+    _bookingCountSubscription = _notificationService
+        .unreadBookingNotificationCountStream(
+          role: 'admin',
+          currentUserId: user.uid,
+        )
+        .listen((count) {
+          if (mounted) {
+            setState(() {
+              _unreadBookingCount = count;
+            });
+          }
+        });
+  }
+
+  void _listenToUnreadChatCount() {
+    _chatCountSubscription?.cancel();
+
+    _chatCountSubscription = _workshopService
+        .unreadCustomerMessagesCountStream()
+        .listen(
+          (count) {
+            debugPrint('Live unread chat count: $count');
+            if (mounted) {
+              setState(() {
+                _unreadChatCount = count;
+              });
+            }
+          },
+          onError: (error) {
+            debugPrint('Unread chat stream error: $error');
+          },
+        );
+  }
+
+  Future<void> _refreshUnreadChatCountOnce() async {
+    try {
+      final count = await _workshopService.getUnreadCustomerMessagesCountOnce();
+
+      if (mounted) {
+        setState(() {
+          _unreadChatCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint('Refresh unread chat count failed: $e');
+    }
+  }
+
+  void _startChatCountAutoRefresh() {
+    _chatRefreshTimer?.cancel();
+
+    _chatRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _refreshUnreadChatCountOnce();
+    });
+  }
+
   Future<void> _loadAdminData() async {
-    setState(() => _isLoadingAdmin = true);
+    if (mounted) {
+      setState(() => _isLoadingAdmin = true);
+    }
 
     try {
       final user = FirebaseAuth.instance.currentUser;
 
       if (user != null) {
         final userData = await _userService.getUserData(user.uid);
+
+        if (!mounted) return;
 
         setState(() {
           _adminName =
@@ -107,7 +202,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               userData?['username'] ??
               user.displayName ??
               'Admin';
+
           _adminEmail = userData?['email'] ?? user.email ?? '';
+
+          _adminProfileImageUrl = (userData?['profileImageUrl'] ?? '')
+              .toString();
         });
       }
     } catch (e) {
@@ -131,7 +230,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     return PopScope(
       canPop: _selectedIndex == 0,
-      // ignore: deprecated_member_use
       onPopInvoked: (didPop) {
         if (didPop) return;
 
@@ -223,13 +321,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Drawer menu button
           IconButton(
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             icon: const Icon(Icons.menu, color: Colors.white, size: 30),
           ),
-
-          // App logo in the center
           Expanded(
             child: Center(
               child: Image.asset(
@@ -239,8 +334,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ),
           ),
-
-          // Notification button on the right
           Container(
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
@@ -313,7 +406,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // Drawer title
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
               child: Text(
@@ -324,10 +416,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
             ),
-
             const Divider(height: 1),
-
-            // Profile section
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: Text(
@@ -344,18 +433,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       overflow: TextOverflow.ellipsis,
                     )
                   : null,
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                Navigator.push(
+                final updated = await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AdminProfilePage()),
                 );
+
+                if (updated == true) {
+                  _loadAdminData();
+                }
               },
             ),
-
             const Divider(height: 1),
-
-            // Theme switch
             ValueListenableBuilder<bool>(
               valueListenable: AdminThemeController.isDark,
               builder: (context, isDark, _) {
@@ -374,9 +464,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 );
               },
             ),
-
             const Divider(height: 1),
-
             ListTile(
               leading: Stack(
                 clipBehavior: Clip.none,
@@ -419,16 +507,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                Navigator.push(
+
+                final changed = await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AdminChatInboxPage()),
                 );
+
+                if (changed == true) {
+                  await _refreshUnreadChatCountOnce();
+                }
               },
             ),
-
-            // Sign out option
             ListTile(
               leading: const Icon(Icons.logout),
               title: Text(
@@ -477,7 +568,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 fit: BoxFit.cover,
               ),
             ),
-
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
@@ -494,7 +584,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
             ),
-
             Positioned(
               right: -20,
               top: -15,
@@ -519,7 +608,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
             ),
-
             Padding(
               padding: const EdgeInsets.all(18),
               child: Column(
@@ -528,26 +616,53 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   Row(
                     children: [
                       Container(
-                        width: 62,
-                        height: 62,
+                        width: 58,
+                        height: 58,
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: Colors.white.withOpacity(0.25),
                           ),
                         ),
-                        child: Center(
-                          child: Text(
-                            _adminName.isNotEmpty
-                                ? _adminName[0].toUpperCase()
-                                : 'A',
-                            style: GoogleFonts.poppins(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: _adminProfileImageUrl.trim().isNotEmpty
+                              ? Builder(
+                                  builder: (context) {
+                                    try {
+                                      return Image.memory(
+                                        base64Decode(_adminProfileImageUrl),
+                                        fit: BoxFit.cover,
+                                      );
+                                    } catch (e) {
+                                      return Center(
+                                        child: Text(
+                                          _adminName.isNotEmpty
+                                              ? _adminName[0].toUpperCase()
+                                              : 'A',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                )
+                              : Center(
+                                  child: Text(
+                                    _adminName.isNotEmpty
+                                        ? _adminName[0].toUpperCase()
+                                        : 'A',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -715,9 +830,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: _buildStatCard(
-              title: "Unread",
-              value: "$_unreadNotificationCount",
-              icon: Icons.mark_email_unread_rounded,
+              title: "Chats",
+              value: "$_unreadChatCount",
+              icon: Icons.chat_bubble_outline_rounded,
               color: Colors.deepPurple,
             ),
           ),
@@ -825,23 +940,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     if (hour < 12) return 'Good Morning 👋';
     if (hour < 17) return 'Good Afternoon 👋';
     return 'Good Evening 👋';
-  }
-
-  Widget _buildSectionTitle(String title) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Text(
-        title,
-        style: GoogleFonts.poppins(
-          color: onSurface,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
   }
 
   Widget _buildQuickActions() {
@@ -1612,53 +1710,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     } finally {
       if (mounted) setState(() => _isSigningOut = false);
     }
-  }
-
-  // Notification handling
-  void _listenToNotificationCounts() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    _notificationCountSubscription?.cancel();
-    _bookingCountSubscription?.cancel();
-
-    _notificationCountSubscription = _notificationService
-        .unreadNotificationCountStream(role: 'admin', currentUserId: user.uid)
-        .listen((count) {
-          if (mounted) {
-            setState(() {
-              _unreadNotificationCount = count;
-            });
-          }
-        });
-
-    _bookingCountSubscription = _notificationService
-        .unreadBookingNotificationCountStream(
-          role: 'admin',
-          currentUserId: user.uid,
-        )
-        .listen((count) {
-          if (mounted) {
-            setState(() {
-              _unreadBookingCount = count;
-            });
-          }
-        });
-  }
-
-  // unread chat count
-  void _listenToUnreadChatCount() {
-    _chatCountSubscription?.cancel();
-
-    _chatCountSubscription = _workshopService
-        .unreadCustomerMessagesCountStream()
-        .listen((count) {
-          if (mounted) {
-            setState(() {
-              _unreadChatCount = count;
-            });
-          }
-        });
   }
 }
 

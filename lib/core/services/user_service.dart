@@ -194,30 +194,32 @@ class UserService {
     }
   }
 
-  /// Update user data
-  Future<void> updateUserData({
-    required String uid,
-    String? fullName,
-    String? phone,
-    DateTime? dateOfBirth,
-    String? profileImageUrl,
-  }) async {
-    try {
-      Map<String, dynamic> updates = {
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      if (fullName != null) updates['fullName'] = fullName;
-      if (phone != null) updates['phone'] = phone;
-      if (dateOfBirth != null) {
-        updates['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
-      }
-      if (profileImageUrl != null) updates['profileImageUrl'] = profileImageUrl;
 
-      await _usersCollection.doc(uid).update(updates);
-      print("User data updated for UID: $uid");
-    } catch (e) {
-      print("Error updating user data: $e");
-      rethrow;
+/// Update user data / profile
+Future<void> updateUserData({
+  required String uid,
+  String? fullName,
+  String? phone,
+  DateTime? dateOfBirth,
+  String? profileImageUrl,
+}) async {
+  try {
+    Map<String, dynamic> updates = {
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (fullName != null) updates['fullName'] = fullName;
+    if (phone != null) updates['phone'] = phone;
+    if (dateOfBirth != null) {
+      updates['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
     }
+    if (profileImageUrl != null) updates['profileImageUrl'] = profileImageUrl;
+
+    await _usersCollection.doc(uid).update(updates);
+    print("User data updated for UID: $uid");
+  } catch (e) {
+    print("Error updating user data: $e");
+    rethrow;
   }
+}
 }
