@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 /// GLOBAL CHAT SERVICE
 /// Reusable for customer, admin, workshop, and technician chat.
@@ -21,16 +22,10 @@ class ChatService {
     final role = senderRole.trim().toLowerCase();
 
     if (role == 'customer') {
-      return {
-        'isReadByAdmin': false,
-        'isReadByCustomer': true,
-      };
+      return {'isReadByAdmin': false, 'isReadByCustomer': true};
     }
 
-    return {
-      'isReadByAdmin': true,
-      'isReadByCustomer': false,
-    };
+    return {'isReadByAdmin': true, 'isReadByCustomer': false};
   }
 
   /// Send plain text message
@@ -77,7 +72,7 @@ class ChatService {
           'senderName': senderName,
           'senderRole': senderRole,
           'createdAt': FieldValue.serverTimestamp(),
-          ..._readFlagsForRole(senderRole),
+          'isReadByAdmin': senderRole == 'customer' ? false : true,
         });
   }
 
@@ -106,7 +101,7 @@ class ChatService {
           'senderName': senderName,
           'senderRole': senderRole,
           'createdAt': FieldValue.serverTimestamp(),
-          ..._readFlagsForRole(senderRole),
+          'isReadByAdmin': senderRole == 'customer' ? false : true,
         });
   }
 
@@ -135,7 +130,7 @@ class ChatService {
           'senderName': senderName,
           'senderRole': senderRole,
           'createdAt': FieldValue.serverTimestamp(),
-          ..._readFlagsForRole(senderRole),
+          'isReadByAdmin': senderRole == 'customer' ? false : true,
         });
   }
 
@@ -148,9 +143,23 @@ class ChatService {
         .where('isReadByAdmin', isEqualTo: false)
         .get();
 
+    debugPrint('Before mark read: ${snapshot.docs.length}');
+
+    final batch = _firestore.batch();
     for (final doc in snapshot.docs) {
-      await doc.reference.update({'isReadByAdmin': true});
+      batch.update(doc.reference, {'isReadByAdmin': true});
     }
+    await batch.commit();
+
+    final after = await _firestore
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('messages')
+        .where('senderRole', isEqualTo: 'customer')
+        .where('isReadByAdmin', isEqualTo: false)
+        .get();
+
+    debugPrint('After mark read: ${after.docs.length}');
   }
 
   Future<int> getUnreadCountForAdmin(String bookingId) async {

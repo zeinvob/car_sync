@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/chat_service.dart';
@@ -71,10 +72,31 @@ class _AdminChatInboxPageState extends State<AdminChatInboxPage> {
 
       final unreadCount = await _chatService.getUnreadCountForAdmin(bookingId);
 
+      String customerProfileImageUrl = '';
+      final customerId = (booking['customerId'] ?? '').toString();
+
+      if (customerId.isNotEmpty) {
+        try {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(customerId)
+              .get();
+
+          if (userDoc.exists) {
+            final userData = userDoc.data() ?? {};
+            customerProfileImageUrl = (userData['profileImageUrl'] ?? '')
+                .toString();
+          }
+        } catch (e) {
+          debugPrint('Failed to load customer profile image: $e');
+        }
+      }
+
       result.add({
         ...booking,
         'lastMessage': lastMessage,
         'unreadCount': unreadCount,
+        'customerProfileImageUrl': customerProfileImageUrl,
       });
     }
 
@@ -132,9 +154,7 @@ class _AdminChatInboxPageState extends State<AdminChatInboxPage> {
             return Center(
               child: Text(
                 'No active chats found.',
-                style: GoogleFonts.poppins(
-                  color: onSurface.withOpacity(0.65),
-                ),
+                style: GoogleFonts.poppins(color: onSurface.withOpacity(0.65)),
               ),
             );
           }
@@ -150,6 +170,8 @@ class _AdminChatInboxPageState extends State<AdminChatInboxPage> {
               final serviceType = (item['serviceType'] ?? 'Service').toString();
               final vehicleDisplay = (item['vehicleDisplay'] ?? '').toString();
               final unreadCount = (item['unreadCount'] ?? 0) as int;
+              final customerProfileImageUrl =
+                  (item['customerProfileImageUrl'] ?? '').toString().trim();
 
               final rawLastMessage = item['lastMessage'];
               final Map<String, dynamic> lastMessage = rawLastMessage is Map
@@ -172,11 +194,9 @@ class _AdminChatInboxPageState extends State<AdminChatInboxPage> {
                           MaterialPageRoute(
                             builder: (_) => WorkshopBookingsPage(
                               workshopId: (item['workshopId'] ?? '').toString(),
-                              workshopName:
-                                  (item['workshopName'] ?? 'Workshop')
-                                      .toString(),
-                              highlightBookingId:
-                                  (item['id'] ?? '').toString(),
+                              workshopName: (item['workshopName'] ?? 'Workshop')
+                                  .toString(),
+                              highlightBookingId: (item['id'] ?? '').toString(),
                             ),
                           ),
                         );
@@ -195,12 +215,20 @@ class _AdminChatInboxPageState extends State<AdminChatInboxPage> {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(18),
                   onTap: () async {
-                    await Navigator.push(
+                    final changed = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => AdminBookingChatPage(booking: item),
                       ),
                     );
+
+                    if (mounted) {
+                      setState(() {});
+                    }
+
+                    if (changed == true && mounted) {
+                      Navigator.pop(context, true);
+                    }
 
                     if (mounted) {
                       setState(() {});
@@ -221,18 +249,50 @@ class _AdminChatInboxPageState extends State<AdminChatInboxPage> {
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 28,
-                          backgroundColor: AppColors.primary.withOpacity(0.12),
-                          child: Text(
-                            customerName.isNotEmpty
-                                ? customerName[0].toUpperCase()
-                                : 'C',
-                            style: GoogleFonts.poppins(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 20,
-                            ),
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.primary.withOpacity(0.12),
+                          ),
+                          child: ClipOval(
+                            child: customerProfileImageUrl.isNotEmpty
+                                ? Builder(
+                                    builder: (context) {
+                                      try {
+                                        return Image.memory(
+                                          base64Decode(customerProfileImageUrl),
+                                          fit: BoxFit.cover,
+                                        );
+                                      } catch (_) {
+                                        return Center(
+                                          child: Text(
+                                            customerName.isNotEmpty
+                                                ? customerName[0].toUpperCase()
+                                                : 'C',
+                                            style: GoogleFonts.poppins(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 20,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  )
+                                : Center(
+                                    child: Text(
+                                      customerName.isNotEmpty
+                                          ? customerName[0].toUpperCase()
+                                          : 'C',
+                                      style: GoogleFonts.poppins(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 20,
+                                      ),
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -301,8 +361,9 @@ class _AdminChatInboxPageState extends State<AdminChatInboxPage> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: Colors.red,
-                                        borderRadius:
-                                            BorderRadius.circular(999),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
                                       ),
                                       child: Text(
                                         unreadCount > 99
@@ -358,6 +419,11 @@ class _AdminBookingChatPageState extends State<AdminBookingChatPage> {
   void initState() {
     super.initState();
     _chatService.markMessagesReadByAdmin(bookingId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -378,20 +444,14 @@ class _AdminBookingChatPageState extends State<AdminBookingChatPage> {
     final file = await _imagePickerService.pickFromGallery();
     if (file == null) return;
 
-    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-    final imageUrl = await _fileUploadService.uploadChatImage(
-      file: file,
-      bookingId: bookingId,
-      fileName: fileName,
-    );
+    final imageBase64 = await _fileUploadService.imageToBase64(file);
 
     await _chatService.sendImageMessage(
       bookingId: bookingId,
       senderId: user.uid,
       senderName: 'Admin',
       senderRole: 'workshop',
-      imageUrl: imageUrl,
+      imageUrl: imageBase64,
     );
   }
 
@@ -574,8 +634,8 @@ class _AdminBookingChatPageState extends State<AdminBookingChatPage> {
                     final sender = (data['senderName'] ?? 'Unknown').toString();
                     final senderRole = (data['senderRole'] ?? '').toString();
                     final messageType = (data['type'] ?? 'text').toString();
-                    final messageText =
-                        (data['text'] ?? data['message'] ?? '').toString();
+                    final messageText = (data['text'] ?? data['message'] ?? '')
+                        .toString();
 
                     final isMe =
                         senderRole == 'workshop' || senderRole == 'admin';
@@ -649,47 +709,137 @@ class _AdminBookingChatPageState extends State<AdminBookingChatPage> {
                                   if ((data['imageUrl'] ?? '')
                                       .toString()
                                       .isNotEmpty)
-                                    GestureDetector(
-                                      onTap: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (_) => Dialog(
-                                            backgroundColor: Colors.transparent,
-                                            child: Stack(
-                                              children: [
-                                                InteractiveViewer(
-                                                  child: Image.network(
-                                                    data['imageUrl'].toString(),
-                                                    fit: BoxFit.contain,
-                                                  ),
+                                    Builder(
+                                      builder: (context) {
+                                        final imageData =
+                                            (data['imageUrl'] ?? '')
+                                                .toString()
+                                                .trim();
+
+                                        final isBase64Image =
+                                            imageData.startsWith('/9j/') ||
+                                            imageData.startsWith('iVBOR') ||
+                                            imageData.startsWith('R0lGOD') ||
+                                            imageData.startsWith('UklGR');
+
+                                        Widget previewImage() {
+                                          if (isBase64Image) {
+                                            try {
+                                              return Image.memory(
+                                                base64Decode(imageData),
+                                                width: 170,
+                                                height: 125,
+                                                fit: BoxFit.cover,
+                                              );
+                                            } catch (_) {
+                                              return Container(
+                                                width: 170,
+                                                height: 125,
+                                                color: Colors.grey.shade300,
+                                                alignment: Alignment.center,
+                                                child: const Icon(
+                                                  Icons.broken_image_outlined,
                                                 ),
-                                                Positioned(
-                                                  top: 10,
-                                                  right: 10,
-                                                  child: IconButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(context),
-                                                    icon: const Icon(
-                                                      Icons.close,
-                                                      color: Colors.white,
-                                                      size: 30,
+                                              );
+                                            }
+                                          }
+
+                                          return Image.network(
+                                            imageData,
+                                            width: 170,
+                                            height: 125,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                                  return Container(
+                                                    width: 170,
+                                                    height: 125,
+                                                    color: Colors.grey.shade300,
+                                                    alignment: Alignment.center,
+                                                    child: const Icon(
+                                                      Icons
+                                                          .broken_image_outlined,
                                                     ),
-                                                  ),
+                                                  );
+                                                },
+                                          );
+                                        }
+
+                                        Widget fullImage() {
+                                          if (isBase64Image) {
+                                            try {
+                                              return Image.memory(
+                                                base64Decode(imageData),
+                                                fit: BoxFit.contain,
+                                              );
+                                            } catch (_) {
+                                              return const Center(
+                                                child: Icon(
+                                                  Icons.broken_image_outlined,
+                                                  color: Colors.white,
+                                                  size: 40,
                                                 ),
-                                              ],
+                                              );
+                                            }
+                                          }
+
+                                          return Image.network(
+                                            imageData,
+                                            fit: BoxFit.contain,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                                  return const Center(
+                                                    child: Icon(
+                                                      Icons
+                                                          .broken_image_outlined,
+                                                      color: Colors.white,
+                                                      size: 40,
+                                                    ),
+                                                  );
+                                                },
+                                          );
+                                        }
+
+                                        return GestureDetector(
+                                          onTap: () {
+                                            showDialog(
+                                              context: context,
+                                              builder: (_) => Dialog(
+                                                backgroundColor:
+                                                    Colors.transparent,
+                                                child: Stack(
+                                                  children: [
+                                                    InteractiveViewer(
+                                                      child: fullImage(),
+                                                    ),
+                                                    Positioned(
+                                                      top: 10,
+                                                      right: 10,
+                                                      child: IconButton(
+                                                        onPressed: () =>
+                                                            Navigator.pop(
+                                                              context,
+                                                            ),
+                                                        icon: const Icon(
+                                                          Icons.close,
+                                                          color: Colors.white,
+                                                          size: 30,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
                                             ),
+                                            child: previewImage(),
                                           ),
                                         );
                                       },
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: Image.network(
-                                          data['imageUrl'].toString(),
-                                          width: 170,
-                                          height: 125,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
                                     ),
                                   if (messageText.isNotEmpty) ...[
                                     const SizedBox(height: 6),
@@ -706,7 +856,8 @@ class _AdminBookingChatPageState extends State<AdminBookingChatPage> {
                             if (messageType == 'file')
                               InkWell(
                                 onTap: () {
-                                  final url = (data['fileUrl'] ?? '').toString();
+                                  final url = (data['fileUrl'] ?? '')
+                                      .toString();
                                   if (url.isNotEmpty) {
                                     _openUrl(url);
                                   }
@@ -740,12 +891,12 @@ class _AdminBookingChatPageState extends State<AdminBookingChatPage> {
                             if (messageType == 'location')
                               InkWell(
                                 onTap: () async {
-                                  final mapUrl =
-                                      (data['mapUrl'] ?? '').toString();
-                                  final lat =
-                                      (data['latitude'] as num?)?.toDouble();
-                                  final lng =
-                                      (data['longitude'] as num?)?.toDouble();
+                                  final mapUrl = (data['mapUrl'] ?? '')
+                                      .toString();
+                                  final lat = (data['latitude'] as num?)
+                                      ?.toDouble();
+                                  final lng = (data['longitude'] as num?)
+                                      ?.toDouble();
 
                                   if (mapUrl.isNotEmpty) {
                                     await _openUrl(mapUrl);
