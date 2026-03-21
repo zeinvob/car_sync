@@ -6,6 +6,7 @@ import 'package:car_sync/core/services/booking_service.dart';
 import 'package:car_sync/core/services/vehicle_service.dart';
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
+import 'package:car_sync/core/theme/theme_controller.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
 import 'package:car_sync/features/customer/pages/add_vehicle_page.dart';
 import 'package:car_sync/features/customer/pages/book_service_page.dart';
@@ -795,7 +796,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'My Bookings',
+                'Service & Bookings',
                 style: GoogleFonts.poppins(
                   fontSize: 24,
                   fontWeight: FontWeight.w600,
@@ -803,6 +804,22 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
               ),
               const SizedBox(height: 16),
+              
+              // Book Service Card
+              _buildBookServiceCard(),
+              const SizedBox(height: 20),
+              
+              // My Bookings Section Title
+              Text(
+                'My Bookings',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 12),
+              
               // Tab Bar
               Container(
                 decoration: BoxDecoration(
@@ -846,6 +863,85 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookServiceCard() {
+    return GestureDetector(
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const BookServicePage()),
+        );
+        if (result == true) {
+          _loadUserData();
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.gradientStart, AppColors.gradientEnd],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.build_circle_outlined,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Book a Service',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Find workshops and schedule your car service',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: Colors.white.withOpacity(0.85),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white70,
+              size: 20,
+            ),
+          ],
         ),
       ),
     );
@@ -1767,9 +1863,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   void _showAppearanceDialog() {
+    final currentMode = ThemeController.themeMode.value;
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(
           'Appearance',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -1777,45 +1875,67 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.light_mode_outlined),
-              title: Text('Light', style: GoogleFonts.poppins()),
+            _buildAppearanceOption(
+              icon: Icons.light_mode_outlined,
+              title: 'Light',
+              isSelected: currentMode == ThemeMode.light,
               onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Light mode selected')),
-                );
+                ThemeController.themeMode.value = ThemeMode.light;
+                Navigator.pop(dialogContext);
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.dark_mode_outlined),
-              title: Text('Dark', style: GoogleFonts.poppins()),
+            _buildAppearanceOption(
+              icon: Icons.dark_mode_outlined,
+              title: 'Dark',
+              isSelected: currentMode == ThemeMode.dark,
               onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Dark mode selected')),
-                );
+                ThemeController.themeMode.value = ThemeMode.dark;
+                Navigator.pop(dialogContext);
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.settings_suggest_outlined),
-              title: Text('System', style: GoogleFonts.poppins()),
+            _buildAppearanceOption(
+              icon: Icons.settings_suggest_outlined,
+              title: 'System',
+              isSelected: currentMode == ThemeMode.system,
               onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('System theme selected')),
-                );
+                ThemeController.themeMode.value = ThemeMode.system;
+                Navigator.pop(dialogContext);
               },
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text('Cancel', style: GoogleFonts.poppins()),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAppearanceOption({
+    required IconData icon,
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: isSelected ? AppColors.primary : null,
+      ),
+      title: Text(
+        title,
+        style: GoogleFonts.poppins(
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          color: isSelected ? AppColors.primary : null,
+        ),
+      ),
+      trailing: isSelected
+          ? const Icon(Icons.check_circle, color: AppColors.primary)
+          : null,
+      onTap: onTap,
     );
   }
 
