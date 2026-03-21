@@ -76,7 +76,56 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bookingId = widget.booking['id'] ?? '';
+    // Try multiple possible key names for the booking ID
+    final bookingId = widget.booking['id'] ?? 
+                       widget.booking['bookingId'] ?? 
+                       widget.booking['docId'] ?? '';
+    
+    // Debug logging
+    debugPrint('BookingDetailsPage - bookingId: $bookingId');
+    debugPrint('BookingDetailsPage - booking keys: ${widget.booking.keys.toList()}');
+    debugPrint('BookingDetailsPage - booking data: ${widget.booking}');
+
+    if (bookingId.toString().isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.fromHistory ? 'Service History' : 'Booking Details',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                'Invalid booking ID',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Keys: ${widget.booking.keys.toList()}',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final String finalBookingId = bookingId.toString();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -88,47 +137,130 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showChatDialog(context, bookingId),
-        backgroundColor: AppColors.primary,
-        elevation: 4,
-        child: const Icon(Icons.chat_bubble, color: Colors.white),
+      floatingActionButton: finalBookingId.isNotEmpty 
+          ? FloatingActionButton(
+              onPressed: () => _showChatDialog(context, finalBookingId),
+              backgroundColor: AppColors.primary,
+              elevation: 4,
+              child: const Icon(Icons.chat_bubble, color: Colors.white),
+            )
+          : null,
+      body: _buildBody(finalBookingId),
+    );
+  }
+
+  Widget _buildBody(String finalBookingId) {
+    // If no valid booking ID, just use the passed booking data directly
+    if (finalBookingId.isEmpty) {
+      return _buildBookingContent(widget.booking, finalBookingId);
+    }
+
+    // Otherwise, stream from Firestore for real-time updates
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _firestore.collection('bookings').doc(finalBookingId).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // Use data from Firestore if available, otherwise use passed booking data
+        Map<String, dynamic> bookingData;
+        if (snapshot.hasData && snapshot.data!.exists) {
+          bookingData = snapshot.data!.data() as Map<String, dynamic>;
+          bookingData['id'] = finalBookingId;
+        } else {
+          // Fallback to the passed booking data
+          bookingData = Map<String, dynamic>.from(widget.booking);
+          bookingData['id'] = finalBookingId;
+        }
+
+        return _buildBookingContent(bookingData, finalBookingId);
+      },
+    );
+  }
+
+  Widget _buildBookingContent(Map<String, dynamic> bookingData, String bookingId) {
+    final currentStatus = (bookingData['status'] ?? 'requested')
+        .toString()
+        .toLowerCase();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHorizontalProgressTracker(bookingData),
+          const SizedBox(height: 24),
+          _buildStatusTimeline(bookingData, bookingId),
+          if (currentStatus == 'requested') ...[
+            const SizedBox(height: 24),
+            _buildCancelButton(bookingId),
+          ],
+        ],
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: _firestore.collection('bookings').doc(bookingId).snapshots(),
+    );
+  }
+
+  Widget _buildAssignedTechnicianInfo(String? technicianId) {
+    // Guard against null or empty technician ID
+    if (technicianId == null || technicianId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: FutureBuilder<DocumentSnapshot>(
+        future: _firestore.collection('users').doc(technicianId).get(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+          String technicianName = 'Loading...';
+          
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final techData = snapshot.data!.data() as Map<String, dynamic>;
+            technicianName = techData['fullName'] ?? techData['name'] ?? 'Assigned Technician';
+          } else if (snapshot.hasError || (snapshot.hasData && !snapshot.data!.exists)) {
+            technicianName = 'Assigned Technician';
           }
 
-          if (!snapshot.hasData || !snapshot.data!.exists) {
-            return Center(
-              child: Text(
-                'Booking not found',
-                style: GoogleFonts.poppins(color: Colors.grey),
-              ),
-            );
-          }
-
-          final bookingData = snapshot.data!.data() as Map<String, dynamic>;
-          bookingData['id'] = bookingId;
-
-          final currentStatus = (bookingData['status'] ?? 'requested')
-              .toString()
-              .toLowerCase();
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
+            ),
+            child: Row(
               children: [
-                _buildHorizontalProgressTracker(bookingData),
-                const SizedBox(height: 24),
-                _buildStatusTimeline(bookingData, bookingId),
-                if (currentStatus == 'requested') ...[
-                  const SizedBox(height: 24),
-                  _buildCancelButton(bookingId),
-                ],
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.engineering, size: 16, color: Colors.orange),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Assigned Technician',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: Colors.orange[700],
+                        ),
+                      ),
+                      Text(
+                        technicianName,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange[800],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -407,6 +539,9 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   }) {
     final showTechnicianUpdates =
         status == 'in_progress' && (isCompleted || isCurrent);
+    final showAssignedTechnician = status == 'confirmed' && 
+        (isCompleted || isCurrent) && 
+        booking['assignedTechnicianId'] != null;
 
     return IntrinsicHeight(
       child: Row(
@@ -540,6 +675,8 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                       ),
                     ),
                   ],
+                  // Assigned Technician for Confirmed status
+                  if (showAssignedTechnician) _buildAssignedTechnicianInfo(booking['assignedTechnicianId']),
                   // Technician Updates for In Progress
                   if (showTechnicianUpdates) _buildTechnicianUpdates(bookingId),
                 ],
@@ -1148,7 +1285,6 @@ class _ChatDialogState extends State<_ChatDialog> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Use smaller size for base64 storage in Firestore
     final file = await _imagePickerService.pickFromGallery(
       maxWidth: 400,
       quality: 60,
@@ -1158,7 +1294,6 @@ class _ChatDialogState extends State<_ChatDialog> {
     setState(() => _isSendingImage = true);
 
     try {
-      // Get user name
       final userDoc = await widget.firestore
           .collection('users')
           .doc(user.uid)
@@ -1166,7 +1301,6 @@ class _ChatDialogState extends State<_ChatDialog> {
       final userData = userDoc.data() ?? {};
       final userName = userData['fullName'] ?? userData['name'] ?? 'Customer';
 
-      // Convert image to base64
       final imageBase64 = await _fileUploadService.imageToBase64(file);
 
       await _chatService.sendImageMessage(
@@ -1174,7 +1308,7 @@ class _ChatDialogState extends State<_ChatDialog> {
         senderId: user.uid,
         senderName: userName,
         senderRole: 'customer',
-        imageUrl: imageBase64, // Store base64 string
+        imageUrl: imageBase64,
       );
     } catch (e) {
       if (mounted) {
@@ -1337,7 +1471,6 @@ class _ChatDialogState extends State<_ChatDialog> {
     _messageController.clear();
 
     try {
-      // Get user data for name
       final userDoc = await widget.firestore
           .collection('users')
           .doc(user.uid)
@@ -1359,12 +1492,14 @@ class _ChatDialogState extends State<_ChatDialog> {
             'isReadByAdmin': false,
           });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send message: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send message: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

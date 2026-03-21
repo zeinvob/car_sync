@@ -287,6 +287,7 @@ class BookingService {
           'updatedAt': data['updatedAt'],
           'statusHistory': data['statusHistory'] ?? {},
         });
+        print('Added booking with id: ${doc.id}');
       }
 
       // Sort locally by createdAt descending

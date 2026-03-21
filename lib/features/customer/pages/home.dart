@@ -19,6 +19,7 @@ import 'package:car_sync/features/customer/pages/help_support_page.dart';
 import 'package:car_sync/features/customer/pages/contact_us_page.dart';
 import 'package:car_sync/features/customer/pages/about_page.dart';
 import 'package:car_sync/features/customer/pages/spare_parts_page.dart';
+import 'package:car_sync/features/customer/pages/customer_support_chat_page.dart';
 import 'package:car_sync/features/customer/pages/workshop_map_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -32,7 +33,8 @@ class CustomerHomePage extends StatefulWidget {
   State<CustomerHomePage> createState() => _CustomerHomePageState();
 }
 
-class _CustomerHomePageState extends State<CustomerHomePage> {
+class _CustomerHomePageState extends State<CustomerHomePage>
+    with SingleTickerProviderStateMixin {
   final AuthService _authService = AuthService();
   final UserService _userService = UserService();
   final BookingService _bookingService = BookingService();
@@ -40,6 +42,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   final NotificationService _notificationService = NotificationService.instance;
 
   int _currentIndex = 0;
+  late TabController _bookingsTabController;
   bool _isLoading = true;
   bool _isSigningOut = false;
 
@@ -53,7 +56,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   @override
   void initState() {
     super.initState();
+    _bookingsTabController = TabController(length: 2, vsync: this);
     _loadUserData();
+  }
+
+  @override
+  void dispose() {
+    _bookingsTabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
@@ -131,6 +141,18 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 _buildProfilePage(),
               ],
             ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CustomerSupportChatPage()),
+                );
+              },
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.support_agent, color: Colors.white),
+            )
+          : null,
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
@@ -347,7 +369,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       children: [
         _buildQuickActionItem(
           icon: Icons.calendar_month_outlined,
-          label: loc?.translate('bookService') ?? 'Book Service',
+          label: loc?.translate('book') ?? 'Book',
           color: AppColors.primary,
           onTap: () async {
             final result = await Navigator.push(
@@ -364,7 +386,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           label: loc?.translate('history') ?? 'History',
           color: AppColors.gradientEnd,
           onTap: () {
-            setState(() => _currentIndex = 1);
+            setState(() {
+              _currentIndex = 1;
+              _bookingsTabController.animateTo(1); // History tab
+            });
           },
         ),
         _buildQuickActionItem(
@@ -442,8 +467,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   Widget _buildActiveBookingCard() {
     final loc = AppLocalizations.of(context);
-    // If no active booking, show placeholder
-    if (_activeBookings.isEmpty) {
+    
+    // Filter to only show requested or confirmed bookings
+    final upcomingBookings = _activeBookings.where((b) {
+      final status = (b['status'] ?? '').toString().toLowerCase();
+      return status == 'requested' || status == 'confirmed';
+    }).toList();
+    
+    // If no upcoming booking, show placeholder
+    if (upcomingBookings.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
@@ -511,8 +543,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       );
     }
 
-    // Show active booking card
-    final booking = _activeBookings.first;
+    // Show upcoming booking card
+    final booking = upcomingBookings.first;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -844,82 +876,81 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       return status == 'completed' || status == 'cancelled';
     }).toList();
 
-    return DefaultTabController(
-      length: 2,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Service & Bookings',
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Service & Bookings',
+              style: GoogleFonts.poppins(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
-              const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 16),
 
-              // Book Service Card
-              _buildBookServiceCard(),
-              const SizedBox(height: 20),
+            // Book Service Card
+            _buildBookServiceCard(),
+            const SizedBox(height: 20),
 
-              // My Bookings Section Title
-              Text(
-                'My Bookings',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+            // My Bookings Section Title
+            Text(
+              'My Bookings',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
-              const SizedBox(height: 12),
+            ),
+            const SizedBox(height: 12),
 
-              // Tab Bar
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
+            // Tab Bar
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                controller: _bookingsTabController,
+                indicator: BoxDecoration(
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: TabBar(
-                  indicator: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.grey[600],
-                  labelStyle: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                  unselectedLabelStyle: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  dividerColor: Colors.transparent,
-                  tabs: [
-                    Tab(text: 'Active (${activeBookings.length})'),
-                    Tab(text: 'History (${historyBookings.length})'),
-                  ],
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.grey[600],
+                labelStyle: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
-              ),
-              const SizedBox(height: 16),
-              // Tab Views
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    // Active Bookings Tab
-                    _buildBookingsList(activeBookings, isHistory: false),
-                    // History Tab
-                    _buildBookingsList(historyBookings, isHistory: true),
-                  ],
+                unselectedLabelStyle: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
                 ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                tabs: [
+                  Tab(text: 'Active (${activeBookings.length})'),
+                  Tab(text: 'History (${historyBookings.length})'),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            // Tab Views
+            Expanded(
+              child: TabBarView(
+                controller: _bookingsTabController,
+                children: [
+                  // Active Bookings Tab
+                  _buildBookingsList(activeBookings, isHistory: false),
+                  // History Tab
+                  _buildBookingsList(historyBookings, isHistory: true),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1055,6 +1086,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     Map<String, dynamic> booking, {
     bool isHistory = false,
   }) {
+    // Debug: Print booking ID to check if it exists
+    debugPrint('_buildBookingCard - booking id: ${booking['id']}');
+    debugPrint('_buildBookingCard - booking keys: ${booking.keys.toList()}');
+    
     final status = (booking['status'] ?? 'pending')
         .toString()
         .toLowerCase()
@@ -2125,7 +2160,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   ) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () => setState(() {
+        _currentIndex = index;
+        // Reset to Active tab when navigating via bottom nav
+        if (index == 1) _bookingsTabController.animateTo(0);
+      }),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

@@ -1,27 +1,126 @@
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/sparepart_service.dart';
+import 'package:car_sync/features/customer/pages/customer_support_chat_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class SparePartsPage extends StatefulWidget {
+class SparePartsPage extends StatelessWidget {
   const SparePartsPage({super.key});
 
+  static final List<Map<String, dynamic>> _categories = [
+    {'name': 'All', 'icon': Icons.apps, 'color': AppColors.primary},
+    {'name': 'Engine', 'icon': Icons.settings, 'color': Colors.red.shade600},
+    {'name': 'Brake', 'icon': Icons.stop_circle_outlined, 'color': Colors.orange.shade600},
+    {'name': 'Suspension', 'icon': Icons.airline_seat_legroom_extra, 'color': Colors.blue.shade600},
+    {'name': 'Electrical', 'icon': Icons.electrical_services, 'color': Colors.purple.shade500},
+    {'name': 'Light', 'icon': Icons.lightbulb_outline, 'color': Colors.amber.shade600},
+    {'name': 'Other', 'icon': Icons.more_horiz, 'color': Colors.teal.shade500},
+  ];
+
   @override
-  State<SparePartsPage> createState() => _SparePartsPageState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Spare Parts',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+      ),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _categories.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final category = _categories[index];
+          return _buildCategoryTile(
+            context: context,
+            name: category['name'] as String,
+            icon: category['icon'] as IconData,
+            color: category['color'] as Color,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryTile({
+    required BuildContext context,
+    required String name,
+    required IconData icon,
+    required Color color,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => SparePartsListPage(category: name)),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                name,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right, color: color),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _SparePartsPageState extends State<SparePartsPage> {
+/// Page to show spare parts filtered by category
+class SparePartsListPage extends StatefulWidget {
+  final String category;
+
+  const SparePartsListPage({super.key, required this.category});
+
+  @override
+  State<SparePartsListPage> createState() => _SparePartsListPageState();
+}
+
+class _SparePartsListPageState extends State<SparePartsListPage> {
   final SparePartService _sparePartService = SparePartService();
   final TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> _allParts = [];
   List<Map<String, dynamic>> _filteredParts = [];
   bool _isLoading = true;
-  String _selectedType = 'All';
-
-  final List<String> _types = ['All', 'Engine', 'Brake', 'Suspension', 'Electrical', 'Body', 'Other'];
 
   @override
   void initState() {
@@ -41,8 +140,19 @@ class _SparePartsPageState extends State<SparePartsPage> {
       final parts = await _sparePartService.getAllSpareParts();
       if (mounted) {
         setState(() {
-          _allParts = parts;
-          _filteredParts = parts;
+          // Filter by category
+          if (widget.category == 'All') {
+            _allParts = parts;
+          } else {
+            _allParts = parts
+                .where(
+                  (part) =>
+                      (part['type'] ?? '').toString().toLowerCase() ==
+                      widget.category.toLowerCase(),
+                )
+                .toList();
+          }
+          _filteredParts = _allParts;
         });
       }
     } catch (e) {
@@ -56,15 +166,14 @@ class _SparePartsPageState extends State<SparePartsPage> {
     final query = _searchController.text.toLowerCase();
     setState(() {
       _filteredParts = _allParts.where((part) {
-        final matchesSearch = query.isEmpty ||
+        return query.isEmpty ||
             (part['part'] ?? '').toString().toLowerCase().contains(query) ||
-            (part['car_model'] ?? '').toString().toLowerCase().contains(query) ||
-            (part['description'] ?? '').toString().toLowerCase().contains(query);
-
-        final matchesType = _selectedType == 'All' ||
-            (part['type'] ?? '').toString().toLowerCase() == _selectedType.toLowerCase();
-
-        return matchesSearch && matchesType;
+            (part['car_model'] ?? '').toString().toLowerCase().contains(
+              query,
+            ) ||
+            (part['description'] ?? '').toString().toLowerCase().contains(
+              query,
+            );
       }).toList();
     });
   }
@@ -74,7 +183,7 @@ class _SparePartsPageState extends State<SparePartsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Spare Parts',
+          widget.category,
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
@@ -109,73 +218,38 @@ class _SparePartsPageState extends State<SparePartsPage> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
               ),
               style: GoogleFonts.poppins(),
             ),
           ),
-
-          // Type Filter Chips
-          SizedBox(
-            height: 50,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: _types.length,
-              itemBuilder: (context, index) {
-                final type = _types[index];
-                final isSelected = _selectedType == type;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: FilterChip(
-                    label: Text(
-                      type,
-                      style: GoogleFonts.poppins(
-                        color: isSelected ? Colors.white : Colors.grey[700],
-                        fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                      ),
-                    ),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() => _selectedType = type);
-                      _filterParts();
-                    },
-                    selectedColor: AppColors.primary,
-                    backgroundColor: Colors.grey.shade100,
-                    checkmarkColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
           const SizedBox(height: 8),
-
-          // Parts Grid (Shopee Style - 2 columns)
+          // Parts Grid
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredParts.isEmpty
-                    ? _buildEmptyState()
-                    : RefreshIndicator(
-                        onRefresh: _loadSpareParts,
-                        child: GridView.builder(
-                          padding: const EdgeInsets.all(10),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                ? _buildEmptyState()
+                : RefreshIndicator(
+                    onRefresh: _loadSpareParts,
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(10),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             childAspectRatio: 0.85,
                             crossAxisSpacing: 8,
                             mainAxisSpacing: 8,
                           ),
-                          itemCount: _filteredParts.length,
-                          itemBuilder: (context, index) {
-                            return _buildPartCard(_filteredParts[index]);
-                          },
-                        ),
-                      ),
+                      itemCount: _filteredParts.length,
+                      itemBuilder: (context, index) {
+                        return _buildPartCard(_filteredParts[index]);
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -199,7 +273,7 @@ class _SparePartsPageState extends State<SparePartsPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Try adjusting your search or filter',
+            'Try adjusting your search',
             style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
           ),
         ],
@@ -210,8 +284,11 @@ class _SparePartsPageState extends State<SparePartsPage> {
   Widget _buildPartCard(Map<String, dynamic> part) {
     final partName = part['part'] ?? 'Unknown Part';
     final carModel = part['car_model'] ?? '';
-    final originalPrice = (part['originalPrice'] ?? part['price'] ?? 0).toDouble();
-    final salePrice = part['salePrice'] != null ? (part['salePrice']).toDouble() : null;
+    final originalPrice = (part['originalPrice'] ?? part['price'] ?? 0)
+        .toDouble();
+    final salePrice = part['salePrice'] != null
+        ? (part['salePrice']).toDouble()
+        : null;
     final discountPercent = part['discountPercent'] ?? 0;
     final stock = part['stock'] ?? 0;
     final type = part['type'] ?? '';
@@ -224,10 +301,7 @@ class _SparePartsPageState extends State<SparePartsPage> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.15),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey.withOpacity(0.15), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -288,7 +362,10 @@ class _SparePartsPageState extends State<SparePartsPage> {
                     top: 0,
                     right: 0,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: const BoxDecoration(
                         color: Color(0xFFEE4D2D), // Shopee orange-red
                         borderRadius: BorderRadius.only(
@@ -319,7 +396,10 @@ class _SparePartsPageState extends State<SparePartsPage> {
                       ),
                       child: Center(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(4),
@@ -338,7 +418,7 @@ class _SparePartsPageState extends State<SparePartsPage> {
                   ),
               ],
             ),
-            
+
             // Product Info
             Padding(
               padding: const EdgeInsets.all(8),
@@ -358,7 +438,7 @@ class _SparePartsPageState extends State<SparePartsPage> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  
+
                   // Car Model
                   if (carModel.isNotEmpty) ...[
                     const SizedBox(height: 2),
@@ -372,9 +452,9 @@ class _SparePartsPageState extends State<SparePartsPage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                  
+
                   const SizedBox(height: 6),
-                  
+
                   // Price Section (Shopee Style)
                   if (onSale) ...[
                     // Sale Price
@@ -407,7 +487,7 @@ class _SparePartsPageState extends State<SparePartsPage> {
                       ),
                     ),
                   ],
-                  
+
                   // Stock Info (Shopee Style)
                   const SizedBox(height: 4),
                   if (isInStock)
@@ -483,28 +563,28 @@ class _PartDetailsSheet extends StatefulWidget {
 }
 
 class _PartDetailsSheetState extends State<_PartDetailsSheet> {
-  final TextEditingController _messageController = TextEditingController();
-  bool _isSubmitting = false;
+  final TextEditingController _quantityController = TextEditingController(text: '1');
+  bool _isBuying = false;
 
   @override
   void dispose() {
-    _messageController.dispose();
+    _quantityController.dispose();
     super.dispose();
   }
 
-  Future<void> _submitEnquiry() async {
+  Future<void> _submitPurchase(int quantity) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please login to submit an enquiry'),
+          content: Text('Please login to make a purchase'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() => _isBuying = true);
 
     try {
       // Get user data
@@ -514,34 +594,54 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
           .get();
       final userData = userDoc.data() ?? {};
 
-      // Create enquiry document
-      final originalPrice = (widget.part['originalPrice'] ?? widget.part['price'] ?? 0).toDouble();
-      final salePrice = widget.part['salePrice'] != null ? (widget.part['salePrice']).toDouble() : null;
+      // Calculate prices
+      final originalPrice =
+          (widget.part['originalPrice'] ?? widget.part['price'] ?? 0)
+              .toDouble();
+      final salePrice = widget.part['salePrice'] != null
+          ? (widget.part['salePrice']).toDouble()
+          : null;
       final onSale = widget.part['onSale'] == true && salePrice != null;
-      
-      await FirebaseFirestore.instance.collection('part_enquiries').add({
+      final unitPrice = onSale ? salePrice! : originalPrice;
+      final totalPrice = unitPrice * quantity;
+
+      // Create order document
+      await FirebaseFirestore.instance.collection('part_orders').add({
         'partId': widget.part['id'] ?? '',
         'partName': widget.part['part'] ?? '',
         'carModel': widget.part['car_model'] ?? '',
+        'imageUrl': widget.part['imageUrl'] ?? '',
+        'type': widget.part['type'] ?? '',
+        'quantity': quantity,
+        'unitPrice': unitPrice,
         'originalPrice': originalPrice,
         'salePrice': salePrice,
-        'finalPrice': onSale ? salePrice : originalPrice,
+        'totalPrice': totalPrice,
         'onSale': onSale,
-        'message': _messageController.text.trim(),
         'customerId': user.uid,
         'customerName': userData['fullName'] ?? userData['name'] ?? 'Customer',
         'customerEmail': user.email ?? '',
         'customerPhone': userData['phone'] ?? '',
-        'status': 'pending',
+        'status': 'pending', // pending, confirmed, shipped, delivered, cancelled
         'createdAt': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context); // Close purchase dialog
+        Navigator.pop(context); // Close details sheet
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Enquiry submitted for ${widget.part['part']}'),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('Order placed for $quantity x ${widget.part['part']}'),
+                ),
+              ],
+            ),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -549,83 +649,227 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to submit enquiry: $e'),
+            content: Text('Failed to place order: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isBuying = false);
     }
   }
 
-  void _showEnquiryDialog() {
+  void _showPurchaseDialog() {
+    final originalPrice =
+        (widget.part['originalPrice'] ?? widget.part['price'] ?? 0).toDouble();
+    final salePrice = widget.part['salePrice'] != null
+        ? (widget.part['salePrice']).toDouble()
+        : null;
+    final onSale = widget.part['onSale'] == true && salePrice != null;
+    final unitPrice = onSale ? salePrice! : originalPrice;
+    final stock = widget.part['stock'] ?? 0;
+    
+    int quantity = 1;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Enquire About Part',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.part['part'] ?? 'Unknown Part',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.primary,
-              ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              'Buy Now',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _messageController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: 'Add a message (optional)\nE.g., quantity needed, urgency, questions...',
-                hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.part['part'] ?? 'Unknown Part',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'RM ${unitPrice.toStringAsFixed(2)} each',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Quantity selector
+                Row(
+                  children: [
+                    Text(
+                      'Quantity:',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove, size: 18),
+                            onPressed: quantity > 1
+                                ? () => setDialogState(() => quantity--)
+                                : null,
+                            constraints: const BoxConstraints(
+                              minWidth: 36,
+                              minHeight: 36,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          Container(
+                            width: 40,
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$quantity',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add, size: 18),
+                            onPressed: quantity < stock
+                                ? () => setDialogState(() => quantity++)
+                                : null,
+                            constraints: const BoxConstraints(
+                              minWidth: 36,
+                              minHeight: 36,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$stock available',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Total price
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total:',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        'RM ${(unitPrice * quantity).toStringAsFixed(2)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.poppins(color: Colors.grey),
                 ),
               ),
-              style: GoogleFonts.poppins(fontSize: 14),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: _isSubmitting
-                ? null
-                : () {
-                    Navigator.pop(context);
-                    _submitEnquiry();
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+              ElevatedButton.icon(
+                onPressed: _isBuying
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        _submitPurchase(quantity);
+                      },
+                icon: _isBuying
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.shopping_cart_checkout, size: 18),
+                label: Text(
+                  _isBuying ? 'Processing...' : 'Confirm Order',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              'Submit',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showChatDialog() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to contact admin'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final partName = widget.part['part'] ?? 'Unknown Part';
+    final carModel = widget.part['car_model'] ?? '';
+
+    // Pre-fill message with part context
+    final initialMessage = carModel.isNotEmpty 
+        ? 'Hi, I have a question about: $partName (for $carModel)'
+        : 'Hi, I have a question about: $partName';
+
+    Navigator.pop(context); // Close part details sheet
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CustomerSupportChatPage(
+          initialContext: initialMessage,
+        ),
       ),
     );
   }
@@ -634,9 +878,13 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
   Widget build(BuildContext context) {
     final partName = widget.part['part'] ?? 'Unknown Part';
     final carModel = widget.part['car_model'] ?? 'Universal';
-    final description = widget.part['description'] ?? 'No description available';
-    final originalPrice = (widget.part['originalPrice'] ?? widget.part['price'] ?? 0).toDouble();
-    final salePrice = widget.part['salePrice'] != null ? (widget.part['salePrice']).toDouble() : null;
+    final description =
+        widget.part['description'] ?? 'No description available';
+    final originalPrice =
+        (widget.part['originalPrice'] ?? widget.part['price'] ?? 0).toDouble();
+    final salePrice = widget.part['salePrice'] != null
+        ? (widget.part['salePrice']).toDouble()
+        : null;
     final discountPercent = widget.part['discountPercent'] ?? 0;
     final stock = widget.part['stock'] ?? 0;
     final type = widget.part['type'] ?? 'Other';
@@ -644,21 +892,26 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
     final onSale = widget.part['onSale'] == true && salePrice != null;
     final isInStock = stock > 0;
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Scrollable content
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
             ),
           ),
           const SizedBox(height: 20),
@@ -729,7 +982,11 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
           // Details
           _buildDetailRow(Icons.directions_car, 'Compatible with', carModel),
           const SizedBox(height: 12),
-          _buildDetailRow(Icons.description_outlined, 'Description', description),
+          _buildDetailRow(
+            Icons.description_outlined,
+            'Description',
+            description,
+          ),
           const SizedBox(height: 12),
           _buildDetailRow(
             Icons.inventory_2_outlined,
@@ -737,129 +994,167 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
             isInStock ? 'In Stock ($stock available)' : 'Out of Stock',
             valueColor: isInStock ? Colors.green : Colors.red,
           ),
-          const SizedBox(height: 24),
-
-          // Price
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.gradientStart, AppColors.gradientEnd],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Price',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    if (onSale && discountPercent > 0)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'You Save $discountPercent%',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (onSale) ...[
-                      // Original price with strikethrough
-                      Text(
-                        'RM ${originalPrice.toStringAsFixed(2)}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.white60,
-                          decoration: TextDecoration.lineThrough,
-                          decorationColor: Colors.white60,
-                        ),
-                      ),
-                      // Sale price
-                      Text(
-                        'RM ${salePrice!.toStringAsFixed(2)}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ] else ...[
-                      Text(
-                        'RM ${originalPrice.toStringAsFixed(2)}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+          const SizedBox(height: 16),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+        ),
+        // Bottom Bar
+        _buildBottomBar(
+          originalPrice: originalPrice,
+          salePrice: salePrice,
+          onSale: onSale,
+          discountPercent: discountPercent,
+          isInStock: isInStock,
+        ),
+      ],
+    );
+  }
 
-          // Contact Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: isInStock
-                  ? () => _showEnquiryDialog()
-                  : null,
-              icon: _isSubmitting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.chat_bubble_outline),
-              label: Text(
-                _isSubmitting ? 'Submitting...' : 'Enquire Now',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                disabledBackgroundColor: Colors.grey[300],
+  Widget _buildBottomBar({
+    required double originalPrice,
+    required double? salePrice,
+    required bool onSale,
+    required int discountPercent,
+    required bool isInStock,
+  }) {
+    final displayPrice = onSale ? salePrice! : originalPrice;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            // Price Section
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (onSale) ...[
+                    Row(
+                      children: [
+                        Text(
+                          'RM${originalPrice.toStringAsFixed(2)}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.grey,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEE4D2D),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            '-$discountPercent%',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  Text(
+                    'RM ${displayPrice.toStringAsFixed(2)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFEE4D2D),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-        ],
+            // Ask Info Button
+            SizedBox(
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: () => _showChatDialog(),
+                icon: const Icon(Icons.support_agent, size: 18),
+                label: Text(
+                  'Ask',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.teal,
+                  side: const BorderSide(color: Colors.teal, width: 1.5),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Buy Now Button
+            SizedBox(
+              height: 44,
+              child: ElevatedButton.icon(
+                onPressed: isInStock ? () => _showPurchaseDialog() : null,
+                icon: _isBuying
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.shopping_cart, size: 18),
+                label: Text(
+                  _isBuying ? 'Processing...' : 'Buy Now',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEE4D2D),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  disabledBackgroundColor: Colors.grey[300],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value, {Color? valueColor}) {
+  Widget _buildDetailRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

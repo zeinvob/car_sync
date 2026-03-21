@@ -10,10 +10,9 @@ class ReviewService {
       final snapshot = await _firestore
           .collection('reviews')
           .where('workshopId', isEqualTo: workshopId)
-          .orderBy('createdAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) {
+      final reviews = snapshot.docs.map((doc) {
         final data = doc.data();
         return {
           'id': doc.id,
@@ -26,6 +25,18 @@ class ReviewService {
           'bookingId': data['bookingId'] ?? '',
         };
       }).toList();
+
+      // Sort locally by createdAt descending
+      reviews.sort((a, b) {
+        final aTime = a['createdAt'] as Timestamp?;
+        final bTime = b['createdAt'] as Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+
+      return reviews;
     } catch (e) {
       print('getWorkshopReviews error: $e');
       return [];
