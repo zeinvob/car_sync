@@ -123,6 +123,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 _buildHomePage(),
                 _buildBookingsPage(),
                 _buildVehiclesPage(),
+                const SparePartsPage(),
                 _buildProfilePage(),
               ],
             ),
@@ -186,34 +187,43 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Widget _buildHeader() {
+    final imageProvider = _getProfileImageProvider();
+    
     return Row(
       children: [
         // Avatar - tap to go to profile
         GestureDetector(
           onTap: () {
-            setState(() => _currentIndex = 3);
+            setState(() => _currentIndex = 4);
           },
           child: Container(
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              gradient: imageProvider == null
+                  ? const LinearGradient(
+                      colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
               borderRadius: BorderRadius.circular(16),
+              image: imageProvider != null
+                  ? DecorationImage(image: imageProvider, fit: BoxFit.cover)
+                  : null,
             ),
-            child: Center(
-              child: Text(
-                _userName.isNotEmpty ? _userName[0].toUpperCase() : 'C',
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+            child: imageProvider == null
+                ? Center(
+                    child: Text(
+                      _userName.isNotEmpty ? _userName[0].toUpperCase() : 'C',
+                      style: GoogleFonts.poppins(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                : null,
           ),
         ),
         const SizedBox(width: 16),
@@ -325,7 +335,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       children: [
         _buildQuickActionItem(
           icon: Icons.calendar_month_outlined,
-          label: 'Book',
+          label: 'Book Service',
           color: AppColors.primary,
           onTap: () async {
             final result = await Navigator.push(
@@ -1238,105 +1248,107 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final transmission = vehicle['transmission'] ?? '';
     final fuelType = vehicle['fuelType'] ?? '';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: () => _navigateToEditVehicle(vehicle),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.directions_car,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.directions_car,
-                    color: AppColors.primary,
-                    size: 28,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$brand $model',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          plateNumber,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$brand $model',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface,
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _navigateToEditVehicle(vehicle);
+                      } else if (value == 'delete') {
+                        _confirmDeleteVehicle(vehicle);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.edit, size: 18),
+                            const SizedBox(width: 8),
+                            Text('Edit', style: GoogleFonts.poppins()),
+                          ],
                         ),
                       ),
-                      Text(
-                        plateNumber,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primary,
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete, size: 18, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Delete',
+                              style: GoogleFonts.poppins(color: Colors.red),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      _navigateToEditVehicle(vehicle);
-                    } else if (value == 'delete') {
-                      _confirmDeleteVehicle(vehicle);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.edit, size: 18),
-                          const SizedBox(width: 8),
-                          Text('Edit', style: GoogleFonts.poppins()),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.delete, size: 18, color: Colors.red),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Delete',
-                            style: GoogleFonts.poppins(color: Colors.red),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (year.isNotEmpty) _buildInfoChip(Icons.calendar_today, year),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (year.isNotEmpty) _buildInfoChip(Icons.calendar_today, year),
                 if (color.isNotEmpty) _buildInfoChip(Icons.palette, color),
                 if (transmission.isNotEmpty)
                   _buildInfoChip(Icons.settings, transmission),
@@ -1346,6 +1358,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1507,7 +1520,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             // Profile Options
             _buildProfileOption(
               icon: Icons.person_outline,
-              title: 'Edit Profile',
+              title: 'My Profile',
               onTap: () async {
                 final result = await Navigator.push(
                   context,
@@ -1518,15 +1531,33 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 }
               },
             ),
+
+            // Preferences Section
+            _buildSectionLabel('Preferences'),
             _buildProfileOption(
-              icon: Icons.notifications_outlined,
-              title: 'Notifications',
+              icon: Icons.location_city_outlined,
+              title: 'State',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notifications coming soon!')),
-                );
+                _showStateSelectionDialog();
               },
             ),
+            _buildProfileOption(
+              icon: Icons.language_outlined,
+              title: 'Language',
+              onTap: () {
+                _showLanguageSelectionDialog();
+              },
+            ),
+            _buildProfileOption(
+              icon: Icons.palette_outlined,
+              title: 'Appearance',
+              onTap: () {
+                _showAppearanceDialog();
+              },
+            ),
+
+            // More Section
+            _buildSectionLabel('More'),
             _buildProfileOption(
               icon: Icons.help_outline,
               title: 'Help & Support',
@@ -1624,6 +1655,170 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
+  Widget _buildSectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[600],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showStateSelectionDialog() {
+    final states = [
+      'Johor',
+      'Kedah',
+      'Kelantan',
+      'Kuala Lumpur',
+      'Labuan',
+      'Melaka',
+      'Negeri Sembilan',
+      'Pahang',
+      'Penang',
+      'Perak',
+      'Perlis',
+      'Putrajaya',
+      'Sabah',
+      'Sarawak',
+      'Selangor',
+      'Terengganu',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Select State',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: states.length,
+            itemBuilder: (context, index) {
+              return ListTile(
+                title: Text(states[index], style: GoogleFonts.poppins()),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('State set to ${states[index]}')),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.poppins()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLanguageSelectionDialog() {
+    final languages = [
+      {'name': 'English', 'code': 'en'},
+      {'name': 'Bahasa Malaysia', 'code': 'ms'},
+      {'name': '中文', 'code': 'zh'},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Select Language',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: languages.map((lang) {
+            return ListTile(
+              title: Text(lang['name']!, style: GoogleFonts.poppins()),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Language set to ${lang['name']}')),
+                );
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.poppins()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAppearanceDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Appearance',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.light_mode_outlined),
+              title: Text('Light', style: GoogleFonts.poppins()),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Light mode selected')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.dark_mode_outlined),
+              title: Text('Dark', style: GoogleFonts.poppins()),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Dark mode selected')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_suggest_outlined),
+              title: Text('System', style: GoogleFonts.poppins()),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('System theme selected')),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.poppins()),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// ============ BOTTOM NAV BAR ============
   Widget _buildBottomNavBar() {
     return Container(
@@ -1656,7 +1851,13 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 Icons.directions_car,
                 'Vehicles',
               ),
-              _buildNavItem(3, Icons.person_outline, Icons.person, 'Profile'),
+              _buildNavItem(
+                3,
+                Icons.build_outlined,
+                Icons.build,
+                'Parts',
+              ),
+              _buildNavItem(4, Icons.person_outline, Icons.person, 'Me'),
             ],
           ),
         ),

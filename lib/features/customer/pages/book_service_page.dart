@@ -113,13 +113,6 @@ class _BookServicePageState extends State<BookServicePage> {
           return ratingB.compareTo(ratingA);
         });
         break;
-      case 'name':
-        _filteredWorkshops.sort((a, b) {
-          final nameA = (a['name'] ?? '').toString().toLowerCase();
-          final nameB = (b['name'] ?? '').toString().toLowerCase();
-          return nameA.compareTo(nameB);
-        });
-        break;
       case 'distance':
         _filteredWorkshops.sort((a, b) {
           final distA = a['distance'] as double?;
@@ -255,48 +248,58 @@ class _BookServicePageState extends State<BookServicePage> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
-          // Sort Options
+          // Sort Options Row
           Row(
             children: [
-              Text(
-                'Sort by:',
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: Colors.grey[600],
+              // Best Rated Button
+              Expanded(
+                child: _buildSortButton(
+                  icon: Icons.star_rounded,
+                  label: 'Best Rated',
+                  value: 'rating',
+                  activeColor: Colors.amber,
                 ),
               ),
-              const SizedBox(width: 12),
-              _buildSortChip('Rating', 'rating'),
-              const SizedBox(width: 8),
-              _buildSortChip('Name', 'name'),
-              const SizedBox(width: 8),
-              _buildSortChip('Distance', 'distance'),
-              const Spacer(),
-              // Map View Button
-              GestureDetector(
-                onTap: _openMapView,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.map, color: Colors.white, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Map',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
+              const SizedBox(width: 10),
+              // Nearest Button
+              Expanded(
+                child: _buildSortButton(
+                  icon: Icons.near_me_rounded,
+                  label: 'Nearest',
+                  value: 'distance',
+                  activeColor: Colors.blue,
+                ),
+              ),
+              const SizedBox(width: 10),
+              // View on Map Button
+              Expanded(
+                child: GestureDetector(
+                  onTap: _openMapView,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.gradientStart, AppColors.gradientEnd],
                       ),
-                    ],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.location_on, color: Colors.white, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          'View Map',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -307,7 +310,12 @@ class _BookServicePageState extends State<BookServicePage> {
     );
   }
 
-  Widget _buildSortChip(String label, String value) {
+  Widget _buildSortButton({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color activeColor,
+  }) {
     final isSelected = _sortBy == value;
     return GestureDetector(
       onTap: () {
@@ -317,21 +325,33 @@ class _BookServicePageState extends State<BookServicePage> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? activeColor.withOpacity(0.15) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.grey[400]!,
+            color: isSelected ? activeColor : Colors.grey.shade300,
+            width: isSelected ? 1.5 : 1,
           ),
         ),
-        child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: isSelected ? Colors.white : Colors.grey[600],
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? activeColor : Colors.grey.shade500,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? activeColor : Colors.grey.shade600,
+              ),
+            ),
+          ],
         ),
       ),
     );
