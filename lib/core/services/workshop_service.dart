@@ -431,30 +431,57 @@ class WorkshopService {
     return bookingsWithCustomer;
   }
 
-
-
   Future<int> getUnreadCustomerMessagesCountOnce() async {
-  int totalUnread = 0;
+    int totalUnread = 0;
 
-  final snapshot = await _firestore.collection('bookings').get();
+    final snapshot = await _firestore.collection('bookings').get();
 
-  for (final bookingDoc in snapshot.docs) {
-    final data = bookingDoc.data();
-    final status = (data['status'] ?? '').toString().toLowerCase();
+    for (final bookingDoc in snapshot.docs) {
+      final data = bookingDoc.data();
+      final status = (data['status'] ?? '').toString().toLowerCase();
 
-    if (status == 'completed' || status == 'cancelled') continue;
+      if (status == 'completed' || status == 'cancelled') continue;
 
-    final messagesSnapshot = await _firestore
-        .collection('bookings')
-        .doc(bookingDoc.id)
-        .collection('messages')
-        .where('senderRole', isEqualTo: 'customer')
-        .where('isReadByAdmin', isEqualTo: false)
-        .get();
+      final messagesSnapshot = await _firestore
+          .collection('bookings')
+          .doc(bookingDoc.id)
+          .collection('messages')
+          .where('senderRole', isEqualTo: 'customer')
+          .where('isReadByAdmin', isEqualTo: false)
+          .get();
 
-    totalUnread += messagesSnapshot.docs.length;
+      totalUnread += messagesSnapshot.docs.length;
+    }
+
+    return totalUnread;
   }
 
-  return totalUnread;
-}
+  // workshops CRUD ----------------------------------------------------///////////////////////
+  Future<String> addWorkshop({required Map<String, dynamic> data}) async {
+    final docRef = _firestore.collection('workshops').doc();
+
+    await docRef.set({
+      ...data,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    return docRef.id;
+  }
+
+  Future<void> updateWorkshop({
+    required String workshopId,
+    required Map<String, dynamic> data,
+  }) async {
+    await _firestore.collection('workshops').doc(workshopId).update({
+      ...data,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> deleteWorkshop({required String workshopId}) async {
+    await _firestore.collection('workshops').doc(workshopId).delete();
+  }
+
+    // workshops CRUD ----------------------------------------------------///////////////////////
 }

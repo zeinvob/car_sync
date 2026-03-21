@@ -13,6 +13,7 @@ import 'package:car_sync/core/widgets/gradient_button.dart';
 import 'package:car_sync/features/admin/presentation/pages/admin_chat_inbox_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/admin_workshops_browser_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/manage_workshops_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
@@ -54,13 +55,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   String _adminName = 'Admin';
   String _adminEmail = '';
   String _adminProfileImageUrl = '';
+
   Timer? _chatRefreshTimer;
+  Timer? _homeRefreshTimer;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     _listenToNotificationCounts();
     _listenToActiveBookingsCount();
     _listenToUnreadChatCount();
@@ -75,6 +80,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     );
 
     _loadAdminData();
+    _startHomeAutoRefresh();
   }
 
   @override
@@ -84,6 +90,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     _activeBookingsSubscription?.cancel();
     _chatCountSubscription?.cancel();
     _chatRefreshTimer?.cancel();
+    _homeRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -92,6 +99,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _listenToUnreadChatCount();
+      _refreshHomeData();
     }
   }
 
@@ -177,9 +185,26 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   void _startChatCountAutoRefresh() {
     _chatRefreshTimer?.cancel();
 
-    _chatRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _chatRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _refreshUnreadChatCountOnce();
     });
+  }
+
+  void _startHomeAutoRefresh() {
+    _homeRefreshTimer?.cancel();
+
+    _homeRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
+      await _refreshHomeData();
+    });
+  }
+
+  Future<void> _refreshHomeData() async {
+    await _loadAdminData();
+    await _refreshUnreadChatCountOnce();
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadAdminData() async {
@@ -262,7 +287,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         _buildTopHeader(),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _loadAdminData,
+            onRefresh: _refreshHomeData,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
@@ -288,7 +313,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                   const SizedBox(height: 24),
                   _buildSectionHeader(
                     "Workshop Overview",
-                    subtitle: "View all available workshops",
+                    subtitle: "View active workshops only",
                   ),
                   const SizedBox(height: 12),
                   _buildWorkshopSection(),
@@ -518,6 +543,28 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                 if (changed == true) {
                   await _refreshUnreadChatCountOnce();
                 }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.garage_outlined),
+              title: Text(
+                "Manage Workshops",
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ManageWorkshopsPage(),
+                  ),
+                );
+
+                await _refreshHomeData();
               },
             ),
             ListTile(
@@ -1197,7 +1244,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _workshopService.getWorkshopList(),
       builder: (context, snapshot) {
-        final items = snapshot.data ?? [];
+        final rawItems = snapshot.data ?? [];
+
+        final items = rawItems.where((item) {
+          return (item['isActive'] ?? false) == true;
+        }).toList();
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
@@ -1207,7 +1258,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         }
 
         if (items.isEmpty) {
-          return _buildEmptyMessage("No workshops found.");
+          return _buildEmptyMessage("No active workshops found.");
         }
 
         return SizedBox(
