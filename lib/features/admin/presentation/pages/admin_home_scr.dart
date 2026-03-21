@@ -5,7 +5,6 @@ import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/services/booking_service.dart';
 import 'package:car_sync/core/services/notification_service.dart';
-import 'package:car_sync/core/services/sparepart_service.dart';
 import 'package:car_sync/core/services/user_service.dart';
 import 'package:car_sync/core/services/workshop_service.dart';
 import 'package:car_sync/core/theme/admin_theme_controller.dart';
@@ -15,9 +14,10 @@ import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.da
 import 'package:car_sync/features/admin/presentation/pages/admin_workshops_browser_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/manage_workshops_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/stock_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
-import 'package:car_sync/features/admin/presentation/pages/stock_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -35,18 +35,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   final NotificationService _notificationService = NotificationService.instance;
   final BookingService _bookingService = BookingService();
   final UserService _userService = UserService();
-  final SparePartService _sparePartService = SparePartService();
   final WorkshopService _workshopService = WorkshopService();
   final AuthService _authService = AuthService();
 
   int _activeBookingsCount = 0;
   int _unreadNotificationCount = 0;
-  int _unreadBookingCount = 0;
   int _unreadChatCount = 0;
 
   StreamSubscription<int>? _activeBookingsSubscription;
   StreamSubscription<int>? _notificationCountSubscription;
-  StreamSubscription<int>? _bookingCountSubscription;
   StreamSubscription<int>? _chatCountSubscription;
 
   bool _isSigningOut = false;
@@ -58,9 +55,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   String _adminProfileImageUrl = '';
 
   Timer? _chatRefreshTimer;
-  Timer? _homeRefreshTimer;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  CollectionReference get _sparePartsCollection =>
+      FirebaseFirestore.instance.collection('spareparts');
 
   @override
   void initState() {
@@ -71,6 +70,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     _listenToActiveBookingsCount();
     _listenToUnreadChatCount();
     _startChatCountAutoRefresh();
+    _loadAdminData();
 
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -79,19 +79,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         statusBarBrightness: Brightness.dark,
       ),
     );
-
-    _loadAdminData();
-    _startHomeAutoRefresh();
   }
 
   @override
   void dispose() {
     _notificationCountSubscription?.cancel();
-    _bookingCountSubscription?.cancel();
     _activeBookingsSubscription?.cancel();
     _chatCountSubscription?.cancel();
     _chatRefreshTimer?.cancel();
-    _homeRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -99,8 +94,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _listenToNotificationCounts();
+      _listenToActiveBookingsCount();
       _listenToUnreadChatCount();
-      _refreshHomeData();
     }
   }
 
@@ -123,7 +119,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     if (user == null) return;
 
     _notificationCountSubscription?.cancel();
-    _bookingCountSubscription?.cancel();
 
     _notificationCountSubscription = _notificationService
         .unreadNotificationCountStream(role: 'admin', currentUserId: user.uid)
@@ -131,19 +126,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
           if (mounted) {
             setState(() {
               _unreadNotificationCount = count;
-            });
-          }
-        });
-
-    _bookingCountSubscription = _notificationService
-        .unreadBookingNotificationCountStream(
-          role: 'admin',
-          currentUserId: user.uid,
-        )
-        .listen((count) {
-          if (mounted) {
-            setState(() {
-              _unreadBookingCount = count;
             });
           }
         });
@@ -156,7 +138,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         .unreadCustomerMessagesCountStream()
         .listen(
           (count) {
-            debugPrint('Live unread chat count: $count');
             if (mounted) {
               setState(() {
                 _unreadChatCount = count;
@@ -191,14 +172,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     });
   }
 
-  void _startHomeAutoRefresh() {
-    _homeRefreshTimer?.cancel();
-
-    _homeRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
-      await _refreshHomeData();
-    });
-  }
-
   Future<void> _refreshHomeData() async {
     await _loadAdminData();
     await _refreshUnreadChatCountOnce();
@@ -230,7 +203,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
               'Admin';
 
           _adminEmail = userData?['email'] ?? user.email ?? '';
-
           _adminProfileImageUrl = (userData?['profileImageUrl'] ?? '')
               .toString();
         });
@@ -242,6 +214,79 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         setState(() => _isLoadingAdmin = false);
       }
     }
+  }
+
+  double _toDouble(dynamic value) {
+    if (value is int) return value.toDouble();
+    if (value is double) return value;
+    return double.tryParse(value?.toString() ?? '0') ?? 0;
+  }
+
+  int _toInt(dynamic value) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? '0') ?? 0;
+  }
+
+  String _readCarModel(Map<String, dynamic> data) {
+    return (data['car model'] ?? '').toString();
+  }
+
+  double _readOriginalPrice(Map<String, dynamic> data) {
+    return _toDouble(data['originalPrice'] ?? data['price'] ?? 0);
+  }
+
+  double _readSalePrice(Map<String, dynamic> data) {
+    final sale = _toDouble(data['salePrice']);
+    final original = _readOriginalPrice(data);
+    return sale <= 0 ? original : sale;
+  }
+
+  int _readDiscountPercent(Map<String, dynamic> data) {
+    final stored = _toInt(data['discountPercent']);
+    if (stored > 0) return stored;
+
+    final original = _readOriginalPrice(data);
+    final sale = _readSalePrice(data);
+
+    if (original <= 0 || sale >= original) return 0;
+    return (((original - sale) / original) * 100).round();
+  }
+
+  bool _isOnSale(Map<String, dynamic> data) {
+    final original = _readOriginalPrice(data);
+    final sale = _readSalePrice(data);
+    return sale < original;
+  }
+
+  String _timeBadgeText(Map<String, dynamic> data) {
+    final updatedAt = data['updatedAt'] as Timestamp?;
+    final createdAt = data['createdAt'] as Timestamp?;
+    final now = DateTime.now();
+
+    final updated = updatedAt?.toDate();
+    final created = createdAt?.toDate();
+
+    if (updated != null) {
+      final diff = now.difference(updated);
+      final isRecentCreate =
+          created != null && now.difference(created).inMinutes <= 30;
+
+      if (isRecentCreate) return 'Just added';
+      if (diff.inMinutes < 60) return 'Updated ${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return 'Updated ${diff.inHours}h ago';
+      if (diff.inDays == 1) return 'Updated yesterday';
+      return 'Updated ${diff.inDays}d ago';
+    }
+
+    if (created != null) {
+      final diff = now.difference(created);
+      if (diff.inMinutes < 60) return 'Added ${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return 'Added ${diff.inHours}h ago';
+      if (diff.inDays == 1) return 'Added yesterday';
+      return 'Added ${diff.inDays}d ago';
+    }
+
+    return 'Recently added';
   }
 
   @override
@@ -427,160 +472,449 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   }
 
   Widget _buildAdminDrawer() {
-    return Drawer(
-      child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-              child: Text(
-                "Admin Menu",
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: Text(
-                "Profile",
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              subtitle: _adminEmail.isNotEmpty
-                  ? Text(
-                      _adminEmail,
-                      style: GoogleFonts.poppins(fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
-                    )
-                  : null,
-              onTap: () async {
-                Navigator.pop(context);
-                final updated = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AdminProfilePage()),
-                );
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final cardColor = Theme.of(context).cardColor;
 
-                if (updated == true) {
-                  _loadAdminData();
-                }
-              },
+    return Drawer(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.20),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 62,
+                      height: 62,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.22),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: _adminProfileImageUrl.trim().isNotEmpty
+                            ? Builder(
+                                builder: (context) {
+                                  try {
+                                    return Image.memory(
+                                      base64Decode(_adminProfileImageUrl),
+                                      fit: BoxFit.cover,
+                                    );
+                                  } catch (_) {
+                                    return Center(
+                                      child: Text(
+                                        _adminName.isNotEmpty
+                                            ? _adminName[0].toUpperCase()
+                                            : 'A',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              )
+                            : Center(
+                                child: Text(
+                                  _adminName.isNotEmpty
+                                      ? _adminName[0].toUpperCase()
+                                      : 'A',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _adminName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _adminEmail.isEmpty ? 'Admin account' : _adminEmail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white.withOpacity(0.88),
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.16),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.20),
+                              ),
+                            ),
+                            child: Text(
+                              'Admin Panel',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const Divider(height: 1),
-            ValueListenableBuilder<bool>(
-              valueListenable: AdminThemeController.isDark,
-              builder: (context, isDark, _) {
-                return SwitchListTile(
-                  title: Text(
-                    "Dark mode",
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                    child: Text(
+                      'Menu',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: onSurface.withOpacity(0.55),
+                      ),
                     ),
                   ),
-                  value: isDark,
-                  onChanged: (val) {
-                    AdminThemeController.setTheme(val);
-                  },
-                );
-              },
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Icon(Icons.chat_bubble_outline_rounded),
-                  if (_unreadChatCount > 0)
-                    Positioned(
-                      right: -8,
-                      top: -6,
-                      child: Container(
+
+                  ValueListenableBuilder<bool>(
+                    valueListenable: AdminThemeController.isDark,
+                    builder: (context, isDark, _) {
+                      return Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1,
+                          horizontal: 14,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(10),
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: onSurface.withOpacity(0.06),
+                          ),
                         ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.10),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.dark_mode_outlined,
+                                color: AppColors.primary,
+                                size: 21,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Dark mode',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: isDark,
+                              onChanged: (val) {
+                                AdminThemeController.setTheme(val);
+                              },
+                              activeColor: AppColors.primary,
+                            ),
+                          ],
                         ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _buildModernDrawerTile(
+                    icon: Icons.person_outline_rounded,
+                    title: 'Profile',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final updated = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminProfilePage(),
+                        ),
+                      );
+
+                      if (updated == true) {
+                        _loadAdminData();
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _buildModernDrawerTile(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: 'Customer Chats',
+                    badgeText: _unreadChatCount > 0
+                        ? (_unreadChatCount > 99 ? '99+' : '$_unreadChatCount')
+                        : null,
+                    onTap: () async {
+                      Navigator.pop(context);
+
+                      final changed = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminChatInboxPage(),
+                        ),
+                      );
+
+                      if (changed == true) {
+                        await _refreshUnreadChatCountOnce();
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _buildModernDrawerTile(
+                    icon: Icons.garage_outlined,
+                    title: 'Manage Workshops',
+                    onTap: () async {
+                      Navigator.pop(context);
+
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ManageWorkshopsPage(),
+                        ),
+                      );
+
+                      await _refreshHomeData();
+                    },
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                    child: Text(
+                      'Session',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: onSurface.withOpacity(0.55),
+                      ),
+                    ),
+                  ),
+
+                  InkWell(
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _handleSignOut();
+                    },
+                    borderRadius: BorderRadius.circular(18),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Colors.red.withOpacity(0.16)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.logout_rounded,
+                              color: Colors.red,
+                              size: 21,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Sign out',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 14,
+                            color: Colors.red,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernDrawerTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    String? badgeText,
+  }) {
+    final cardColor = Theme.of(context).cardColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: onSurface.withOpacity(0.06)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 21),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
                         child: Text(
-                          _unreadChatCount > 99 ? '99+' : '$_unreadChatCount',
-                          textAlign: TextAlign.center,
+                          title,
                           style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: onSurface,
                           ),
                         ),
                       ),
-                    ),
+                      if (badgeText != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                AppColors.gradientStart,
+                                AppColors.gradientEnd,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            badgeText,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
                 ],
               ),
-              title: Text(
-                "Customer Chats",
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              onTap: () async {
-                Navigator.pop(context);
-
-                final changed = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AdminChatInboxPage()),
-                );
-
-                if (changed == true) {
-                  await _refreshUnreadChatCountOnce();
-                }
-              },
             ),
-            ListTile(
-              leading: const Icon(Icons.garage_outlined),
-              title: Text(
-                "Manage Workshops",
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              onTap: () async {
-                Navigator.pop(context);
-
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ManageWorkshopsPage(),
-                  ),
-                );
-
-                await _refreshHomeData();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: Text(
-                "Sign out",
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              onTap: () async {
-                Navigator.pop(context);
-                await _handleSignOut();
-              },
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 14,
+              color: onSurface.withOpacity(0.45),
             ),
           ],
         ),
@@ -1201,11 +1535,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   }
 
   Widget _buildRecentlyAddedSection() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _sparePartService.getRecentSpareParts(),
+    return StreamBuilder<QuerySnapshot>(
+      stream: _sparePartsCollection.snapshots(),
       builder: (context, snapshot) {
-        final items = snapshot.data ?? [];
-
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.all(16),
@@ -1213,31 +1545,321 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
           );
         }
 
-        if (items.isEmpty) {
+        if (snapshot.hasError) {
+          return _buildEmptyMessage("Failed to load spare parts.");
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        if (docs.isEmpty) {
           return _buildEmptyMessage("No spare parts found.");
         }
 
+        final sortedDocs = [...docs];
+        sortedDocs.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+
+          final aTime =
+              (aData['updatedAt'] as Timestamp?) ??
+              (aData['createdAt'] as Timestamp?);
+          final bTime =
+              (bData['updatedAt'] as Timestamp?) ??
+              (bData['createdAt'] as Timestamp?);
+
+          if (aTime == null && bTime == null) return 0;
+          if (aTime == null) return 1;
+          if (bTime == null) return -1;
+          return bTime.compareTo(aTime);
+        });
+
+        final items = sortedDocs.take(10).toList();
+
         return SizedBox(
-          height: 315,
+          height: 320,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(width: 14),
             itemBuilder: (context, index) {
-              final item = items[index];
-              return _buildProductCard(
-                title: item['part'] ?? 'No Part',
-                subtitle: item['car_model'] ?? 'No Model',
-                price: "RM ${item['price'] ?? 0}",
-                stock: item['stock'] ?? 0,
-                imageUrl: (item['imageUrl'] ?? '').toString(),
-                onTap: () {},
+              final doc = items[index];
+              final item = doc.data() as Map<String, dynamic>;
+
+              return _buildRecentStockCard(
+                item: item,
+                onTap: () {
+                  setState(() => _selectedIndex = 3);
+                },
               );
             },
           ),
         );
       },
+    );
+  }
+
+  Widget _buildRecentStockCard({
+    required Map<String, dynamic> item,
+    required VoidCallback onTap,
+  }) {
+    final cardColor = Theme.of(context).cardColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    final title = (item['part'] ?? 'No Part').toString();
+    final carModel = _readCarModel(item);
+    final imageUrl = (item['imageUrl'] ?? '').toString();
+    final type = (item['type'] ?? 'Other').toString();
+
+    final stock = _toInt(item['stock']);
+    final originalPrice = _readOriginalPrice(item);
+    final salePrice = _readSalePrice(item);
+    final discountPercent = _readDiscountPercent(item);
+    final onSale = _isOnSale(item);
+
+    final lowStock = stock > 0 && stock <= 5;
+    final unavailable = stock <= 0;
+
+    Color statusColor;
+    String statusText;
+
+    if (unavailable) {
+      statusColor = Colors.red;
+      statusText = 'Unavailable';
+    } else if (lowStock) {
+      statusColor = Colors.orange;
+      statusText = 'Low Stock';
+    } else {
+      statusColor = Colors.green;
+      statusText = 'Available';
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 220,
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
+          border: Border.all(color: onSurface.withOpacity(0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(22),
+                  ),
+                  child: Container(
+                    height: 125,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.gradientStart.withOpacity(0.12),
+                          AppColors.gradientEnd.withOpacity(0.08),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: imageUrl.trim().isNotEmpty
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) {
+                              return const Center(
+                                child: Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 42,
+                                  color: AppColors.primary,
+                                ),
+                              );
+                            },
+                          )
+                        : const Center(
+                            child: Icon(
+                              Icons.inventory_2_outlined,
+                              size: 42,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                  ),
+                ),
+                Positioned(
+                  left: 10,
+                  top: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.92),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      type,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                if (onSale && discountPercent > 0)
+                  Positioned(
+                    right: 10,
+                    top: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            AppColors.gradientStart,
+                            AppColors.gradientEnd,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$discountPercent% OFF',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      carModel.isEmpty ? 'No car model' : carModel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: onSurface.withOpacity(0.68),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$statusText • $stock',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _timeBadgeText(item),
+                        style: GoogleFonts.poppins(
+                          fontSize: 10.2,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (onSale && discountPercent > 0)
+                                Text(
+                                  'RM ${originalPrice.toStringAsFixed(2)}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 10.5,
+                                    color: Colors.grey,
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                                ),
+                              Text(
+                                'RM ${salePrice.toStringAsFixed(2)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1293,173 +1915,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
           ),
         );
       },
-    );
-  }
-
-  Widget _buildProductCard({
-    required String title,
-    required String subtitle,
-    required String price,
-    required int stock,
-    required String imageUrl,
-    required VoidCallback onTap,
-  }) {
-    final cardColor = Theme.of(context).cardColor;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-
-    final lowStock = stock <= 5;
-    final hasImage = imageUrl.trim().isNotEmpty;
-
-    return Container(
-      width: 205,
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(22),
-                ),
-                child: Container(
-                  height: 125,
-                  width: double.infinity,
-                  color: onSurface.withOpacity(0.06),
-                  child: hasImage
-                      ? Image.network(
-                          imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Center(
-                              child: Icon(
-                                Icons.build_circle_outlined,
-                                size: 46,
-                                color: AppColors.primary,
-                              ),
-                            );
-                          },
-                        )
-                      : const Center(
-                          child: Icon(
-                            Icons.build_circle_outlined,
-                            size: 46,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                ),
-              ),
-              Positioned(
-                top: 10,
-                right: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: lowStock
-                        ? Colors.red.withOpacity(0.92)
-                        : Colors.black.withOpacity(0.65),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    lowStock ? "Low Stock" : "Available",
-                    style: GoogleFonts.poppins(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      height: 1.4,
-                      color: onSurface.withOpacity(0.68),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: onSurface.withOpacity(0.06),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          "Stock: $stock",
-                          style: GoogleFonts.poppins(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: lowStock ? Colors.red : onSurface,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        price,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  SizedBox(
-                    width: double.infinity,
-                    child: GradientButton(
-                      text: "Add",
-                      height: 42,
-                      borderRadius: 12,
-                      onPressed: onTap,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
