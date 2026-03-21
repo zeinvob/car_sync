@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
-import 'package:car_sync/features/dummy/pages/home_scr.dart';
 
 class CompleteProfilePage extends StatefulWidget {
   const CompleteProfilePage({super.key});
@@ -133,10 +132,10 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
       );
 
       // Navigate to home screen
-      Navigator.pushReplacement(
+      /*Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
+      );*/
     } catch (e) {
       _showErrorAlert("Error", "Failed to save profile: $e");
     } finally {

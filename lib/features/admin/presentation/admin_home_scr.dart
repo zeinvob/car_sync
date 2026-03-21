@@ -16,6 +16,7 @@ import 'package:car_sync/features/admin/presentation/pages/manage_workshops_page
 import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/stock_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
+import 'package:car_sync/features/admin/presentation/widgets/floating_support_chat_button.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -315,6 +316,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         body: Stack(
           children: [
             pages[_selectedIndex],
+            FloatingSupportChatButton(adminName: _adminName),
             if (_isSigningOut)
               Container(
                 color: Colors.black.withOpacity(0.3),

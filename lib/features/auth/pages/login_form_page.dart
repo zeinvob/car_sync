@@ -1,6 +1,6 @@
 import 'package:car_sync/features/auth/pages/signup_page.dart';
-import 'package:car_sync/features/dummy/pages/home_scr.dart';
 import 'package:car_sync/features/customer/pages/home.dart';
+import 'package:car_sync/features/technician/pages/home.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/services/auth_service.dart';
@@ -8,7 +8,7 @@ import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
 import 'package:car_sync/features/auth/pages/verify_email_page.dart';
 import 'package:car_sync/features/auth/pages/complete_profile_page.dart';
-import 'package:car_sync/features/admin/presentation/pages/admin_home_scr.dart';
+import 'package:car_sync/features/admin/presentation/admin_home_scr.dart';
 import 'package:car_sync/features/customer/pages/home.dart';
 import 'package:car_sync/main.dart';
 
@@ -389,7 +389,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
           // Navigate to Technician/Foreman Home Screen
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            MaterialPageRoute(builder: (context) => const TechnicianHome()),
             (route) => false,
           );
         } else {

@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:car_sync/features/dummy/pages/home_scr.dart';
 import 'package:car_sync/features/customer/pages/home.dart';
 import 'package:car_sync/features/splash/pages/video_splash_scr.dart';
 import 'package:car_sync/core/services/auth_service.dart';
-import 'package:car_sync/features/admin/presentation/pages/admin_home_scr.dart';
+import 'package:car_sync/features/admin/presentation/admin_home_scr.dart';
+import 'package:car_sync/features/technician/pages/home.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/theme/theme_controller.dart';
 import 'package:car_sync/core/services/auth_nav_flag.dart';
@@ -193,7 +193,7 @@ class RoleBasedHomeLoader extends StatelessWidget {
         if (role == 'admin') {
           return const AdminThemeWrapper(child: AdminHomeScreen());
         } else if (role == 'technician' || role == 'foreman') {
-          return const HomeScreen();
+          return const TechnicianHome();
         } else {
           return const CustomerHomePage();
         }
