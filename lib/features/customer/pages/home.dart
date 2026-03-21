@@ -141,16 +141,18 @@ class _CustomerHomePageState extends State<CustomerHomePage>
                 _buildProfilePage(),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CustomerSupportChatPage()),
-          );
-        },
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.support_agent, color: Colors.white),
-      ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CustomerSupportChatPage()),
+                );
+              },
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.support_agent, color: Colors.white),
+            )
+          : null,
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
@@ -367,7 +369,7 @@ class _CustomerHomePageState extends State<CustomerHomePage>
       children: [
         _buildQuickActionItem(
           icon: Icons.calendar_month_outlined,
-          label: loc?.translate('bookService') ?? 'Book Service',
+          label: loc?.translate('book') ?? 'Book',
           color: AppColors.primary,
           onTap: () async {
             final result = await Navigator.push(
@@ -1084,6 +1086,10 @@ class _CustomerHomePageState extends State<CustomerHomePage>
     Map<String, dynamic> booking, {
     bool isHistory = false,
   }) {
+    // Debug: Print booking ID to check if it exists
+    debugPrint('_buildBookingCard - booking id: ${booking['id']}');
+    debugPrint('_buildBookingCard - booking keys: ${booking.keys.toList()}');
+    
     final status = (booking['status'] ?? 'pending')
         .toString()
         .toLowerCase()
