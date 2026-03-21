@@ -17,6 +17,7 @@ import 'package:car_sync/features/admin/presentation/pages/manage_workshops_page
 import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/stock_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -249,7 +250,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       _buildHomePage(),
       const AdminWorkshopsBrowserPage(),
       const _SimplePage(title: "Services Page"),
-      const _SimplePage(title: "Stock Page"),
+      const StockPage(),
       const _SimplePage(title: "Parts Order Page"),
     ];
 
