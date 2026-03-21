@@ -154,7 +154,7 @@ class _SparePartsPageState extends State<SparePartsPage> {
 
           const SizedBox(height: 8),
 
-          // Parts List
+          // Parts Grid (Shopee Style - 2 columns)
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -162,8 +162,14 @@ class _SparePartsPageState extends State<SparePartsPage> {
                     ? _buildEmptyState()
                     : RefreshIndicator(
                         onRefresh: _loadSpareParts,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(10),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.85,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
                           itemCount: _filteredParts.length,
                           itemBuilder: (context, index) {
                             return _buildPartCard(_filteredParts[index]);
@@ -204,140 +210,218 @@ class _SparePartsPageState extends State<SparePartsPage> {
   Widget _buildPartCard(Map<String, dynamic> part) {
     final partName = part['part'] ?? 'Unknown Part';
     final carModel = part['car_model'] ?? '';
-    final description = part['description'] ?? '';
-    final price = part['price'] ?? 0;
+    final originalPrice = (part['originalPrice'] ?? part['price'] ?? 0).toDouble();
+    final salePrice = part['salePrice'] != null ? (part['salePrice']).toDouble() : null;
+    final discountPercent = part['discountPercent'] ?? 0;
     final stock = part['stock'] ?? 0;
     final type = part['type'] ?? '';
     final imageUrl = part['imageUrl'] ?? '';
+    final onSale = part['onSale'] == true && salePrice != null;
 
     final isInStock = stock > 0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.15),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: InkWell(
         onTap: () => _showPartDetails(part),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Part Image
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: _getTypeColor(type).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: imageUrl.isNotEmpty
-                      ? Image.network(
-                          imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(
-                            _getTypeIcon(type),
-                            color: _getTypeColor(type),
-                            size: 28,
+        borderRadius: BorderRadius.circular(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Product Image with Badge
+            Stack(
+              children: [
+                // Image Container
+                Container(
+                  width: double.infinity,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    color: _getTypeColor(type).withOpacity(0.08),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      topRight: Radius.circular(8),
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      topRight: Radius.circular(8),
+                    ),
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Icon(
+                                _getTypeIcon(type),
+                                color: _getTypeColor(type),
+                                size: 40,
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Icon(
+                              _getTypeIcon(type),
+                              color: _getTypeColor(type),
+                              size: 40,
+                            ),
                           ),
-                        )
-                      : Icon(
-                          _getTypeIcon(type),
-                          color: _getTypeColor(type),
-                          size: 28,
-                        ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
-
-              // Part Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      partName,
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
+                // Discount Badge (Shopee Style)
+                if (onSale && discountPercent > 0)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEE4D2D), // Shopee orange-red
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(8),
+                          bottomLeft: Radius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        '-$discountPercent%',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                    if (carModel.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        carModel,
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          color: Colors.grey[600],
+                  ),
+                // Out of Stock Overlay
+                if (!isInStock)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          topRight: Radius.circular(8),
                         ),
                       ),
-                    ],
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        // Price
-                        Text(
-                          'RM ${price.toStringAsFixed(2)}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const Spacer(),
-                        // Stock Status
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: isInStock
-                                ? Colors.green.withOpacity(0.1)
-                                : Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            isInStock ? 'In Stock ($stock)' : 'Out of Stock',
+                            'Out of Stock',
                             style: GoogleFonts.poppins(
                               fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: isInStock ? Colors.green : Colors.red,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[700],
                             ),
                           ),
                         ),
-                      ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            
+            // Product Info
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Product Name
+                  Text(
+                    partName,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  // Car Model
+                  if (carModel.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      carModel,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        color: Colors.grey[500],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                ),
+                  
+                  const SizedBox(height: 6),
+                  
+                  // Price Section (Shopee Style)
+                  if (onSale) ...[
+                    // Sale Price
+                    Text(
+                      'RM${salePrice!.toStringAsFixed(2)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFEE4D2D), // Shopee orange-red
+                      ),
+                    ),
+                    // Original Price with strikethrough
+                    Text(
+                      'RM${originalPrice.toStringAsFixed(2)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: Colors.grey,
+                        decoration: TextDecoration.lineThrough,
+                        decorationColor: Colors.grey,
+                      ),
+                    ),
+                  ] else ...[
+                    // Regular Price
+                    Text(
+                      'RM${originalPrice.toStringAsFixed(2)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFEE4D2D),
+                      ),
+                    ),
+                  ],
+                  
+                  // Stock Info (Shopee Style)
+                  const SizedBox(height: 4),
+                  if (isInStock)
+                    Text(
+                      '$stock left',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -431,11 +515,18 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
       final userData = userDoc.data() ?? {};
 
       // Create enquiry document
+      final originalPrice = (widget.part['originalPrice'] ?? widget.part['price'] ?? 0).toDouble();
+      final salePrice = widget.part['salePrice'] != null ? (widget.part['salePrice']).toDouble() : null;
+      final onSale = widget.part['onSale'] == true && salePrice != null;
+      
       await FirebaseFirestore.instance.collection('part_enquiries').add({
         'partId': widget.part['id'] ?? '',
         'partName': widget.part['part'] ?? '',
         'carModel': widget.part['car_model'] ?? '',
-        'price': widget.part['price'] ?? 0,
+        'originalPrice': originalPrice,
+        'salePrice': salePrice,
+        'finalPrice': onSale ? salePrice : originalPrice,
+        'onSale': onSale,
         'message': _messageController.text.trim(),
         'customerId': user.uid,
         'customerName': userData['fullName'] ?? userData['name'] ?? 'Customer',
@@ -544,10 +635,13 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
     final partName = widget.part['part'] ?? 'Unknown Part';
     final carModel = widget.part['car_model'] ?? 'Universal';
     final description = widget.part['description'] ?? 'No description available';
-    final price = widget.part['price'] ?? 0;
+    final originalPrice = (widget.part['originalPrice'] ?? widget.part['price'] ?? 0).toDouble();
+    final salePrice = widget.part['salePrice'] != null ? (widget.part['salePrice']).toDouble() : null;
+    final discountPercent = widget.part['discountPercent'] ?? 0;
     final stock = widget.part['stock'] ?? 0;
     final type = widget.part['type'] ?? 'Other';
     final imageUrl = widget.part['imageUrl'] ?? '';
+    final onSale = widget.part['onSale'] == true && salePrice != null;
     final isInStock = stock > 0;
 
     return Container(
@@ -658,20 +752,69 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Price',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Price',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    if (onSale && discountPercent > 0)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'You Save $discountPercent%',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                Text(
-                  'RM ${price.toStringAsFixed(2)}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (onSale) ...[
+                      // Original price with strikethrough
+                      Text(
+                        'RM ${originalPrice.toStringAsFixed(2)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: Colors.white60,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: Colors.white60,
+                        ),
+                      ),
+                      // Sale price
+                      Text(
+                        'RM ${salePrice!.toStringAsFixed(2)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ] else ...[
+                      Text(
+                        'RM ${originalPrice.toStringAsFixed(2)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

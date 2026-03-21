@@ -1,6 +1,7 @@
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
 import 'package:car_sync/features/auth/pages/login_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:car_sync/features/dummy/pages/home_scr.dart';
@@ -11,16 +12,18 @@ import 'package:car_sync/features/admin/presentation/pages/admin_home_scr.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/theme/theme_controller.dart';
 import 'package:car_sync/core/services/auth_nav_flag.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/theme/admin_theme_controller.dart';
+import 'package:car_sync/core/localization/app_localizations.dart';
+import 'package:car_sync/core/localization/locale_controller.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await LocaleController.init();
   runApp(const MyApp());
 }
 
@@ -39,12 +42,25 @@ class _MyAppState extends State<MyApp> {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: ThemeController.themeMode,
       builder: (context, mode, _) {
-        return MaterialApp(
-          title: 'Car Sync',
-          debugShowCheckedModeBanner: false,
-          themeMode: mode,
+        return ValueListenableBuilder<Locale>(
+          valueListenable: LocaleController.locale,
+          builder: (context, locale, _) {
+            return MaterialApp(
+              title: 'Car Sync',
+              debugShowCheckedModeBanner: false,
+              themeMode: mode,
+              
+              // Localization
+              locale: locale,
+              supportedLocales: LocaleController.supportedLocales,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
 
-          theme: ThemeData(
+              theme: ThemeData(
             brightness: Brightness.light,
             fontFamily: 'Poppins',
             primaryColor: AppColors.primary,
@@ -142,6 +158,8 @@ class _MyAppState extends State<MyApp> {
                     );
                   },
                 ),
+            );
+          },
         );
       },
     );

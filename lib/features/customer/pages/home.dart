@@ -7,6 +7,8 @@ import 'package:car_sync/core/services/vehicle_service.dart';
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/theme/theme_controller.dart';
+import 'package:car_sync/core/localization/locale_controller.dart';
+import 'package:car_sync/core/localization/app_localizations.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
 import 'package:car_sync/features/customer/pages/add_vehicle_page.dart';
 import 'package:car_sync/features/customer/pages/book_service_page.dart';
@@ -17,6 +19,7 @@ import 'package:car_sync/features/customer/pages/help_support_page.dart';
 import 'package:car_sync/features/customer/pages/contact_us_page.dart';
 import 'package:car_sync/features/customer/pages/about_page.dart';
 import 'package:car_sync/features/customer/pages/spare_parts_page.dart';
+import 'package:car_sync/features/customer/pages/workshop_map_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -151,6 +154,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   /// ============ HOME TAB ============
   Widget _buildHomePage() {
+    final loc = AppLocalizations.of(context);
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: _loadUserData,
@@ -165,19 +169,25 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               const SizedBox(height: 24),
 
               // Latest News & Updates Banner
-              _buildSectionTitle('Latest Updates'),
+              _buildSectionTitle(
+                loc?.translate('latestUpdates') ?? 'Latest Updates',
+              ),
               const SizedBox(height: 12),
               _buildNewsBanner(),
               const SizedBox(height: 24),
 
               // Quick Actions
-              _buildSectionTitle('Quick Actions'),
+              _buildSectionTitle(
+                loc?.translate('quickActions') ?? 'Quick Actions',
+              ),
               const SizedBox(height: 12),
               _buildQuickActions(),
               const SizedBox(height: 24),
 
               // Upcoming Booking Status
-              _buildSectionTitle('Upcoming Booking'),
+              _buildSectionTitle(
+                loc?.translate('upcomingBooking') ?? 'Upcoming Booking',
+              ),
               const SizedBox(height: 12),
               _buildActiveBookingCard(),
             ],
@@ -189,7 +199,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   Widget _buildHeader() {
     final imageProvider = _getProfileImageProvider();
-    
+
     return Row(
       children: [
         // Avatar - tap to go to profile
@@ -331,12 +341,13 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Widget _buildQuickActions() {
+    final loc = AppLocalizations.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         _buildQuickActionItem(
           icon: Icons.calendar_month_outlined,
-          label: 'Book Service',
+          label: loc?.translate('bookService') ?? 'Book Service',
           color: AppColors.primary,
           onTap: () async {
             final result = await Navigator.push(
@@ -350,7 +361,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         ),
         _buildQuickActionItem(
           icon: Icons.history,
-          label: 'History',
+          label: loc?.translate('history') ?? 'History',
           color: AppColors.gradientEnd,
           onTap: () {
             setState(() => _currentIndex = 1);
@@ -358,7 +369,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         ),
         _buildQuickActionItem(
           icon: Icons.directions_car_outlined,
-          label: 'My Cars',
+          label: loc?.translate('myCars') ?? 'My Cars',
           color: Colors.orange,
           onTap: () {
             setState(() => _currentIndex = 2);
@@ -366,14 +377,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         ),
         _buildQuickActionItem(
           icon: Icons.build_outlined,
-          label: 'Spare Parts',
+          label: loc?.translate('spareParts') ?? 'Spare Parts',
           color: Colors.teal,
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const SparePartsPage(),
-              ),
+              MaterialPageRoute(builder: (_) => const SparePartsPage()),
             );
           },
         ),
@@ -432,6 +441,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Widget _buildActiveBookingCard() {
+    final loc = AppLocalizations.of(context);
     // If no active booking, show placeholder
     if (_activeBookings.isEmpty) {
       return Container(
@@ -457,7 +467,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No Upcoming Booking',
+              loc?.translate('noUpcomingBooking') ?? 'No Upcoming Booking',
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -466,7 +476,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Book a service to get started',
+              loc?.translate('bookToStart') ?? 'Book a service to get started',
               style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[500]),
             ),
             const SizedBox(height: 16),
@@ -492,7 +502,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
               ),
               child: Text(
-                'Book Now',
+                loc?.translate('bookNow') ?? 'Book Now',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
               ),
             ),
@@ -585,33 +595,56 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       {
         'title': 'Free Car Check-up',
         'subtitle': 'LIMITED TIME',
-        'description': 'Get a complimentary 20-point inspection with any service booking this month!',
+        'description':
+            'Collect 2x point with any service booking this month!',
         'icon': Icons.verified_outlined,
         'gradient': [const Color(0xFF667eea), const Color(0xFF764ba2)],
         'emoji': '🎁',
+        'buttonText': 'Book Now',
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const BookServicePage()),
+          );
+        },
       },
       {
         'title': 'New Workshop Partner',
         'subtitle': 'ANNOUNCEMENT',
-        'description': 'We\'ve partnered with Premium Auto Care - now available in your area.',
+        'description':
+            'We\'ve partnered with Premium Auto Care - now available in your area.',
         'icon': Icons.handshake_outlined,
         'gradient': [const Color(0xFF0083B0), const Color(0xFF00B4DB)],
         'emoji': '🤝',
+        'buttonText': 'View',
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const WorkshopMapPage()),
+          );
+        },
       },
       {
         'title': 'Spare Parts Sale',
         'subtitle': 'UP TO 20% OFF',
-        'description': 'Exclusive discounts on selected spare parts. Check out our catalogue!',
+        'description':
+            'Exclusive discounts on selected spare parts. Check out our catalogue!',
         'icon': Icons.local_fire_department_outlined,
         'gradient': [const Color(0xFFf5af19), const Color(0xFFf12711)],
         'emoji': '🔥',
+        'buttonText': 'Shop Now',
+        'onTap': () {
+          setState(() {
+            _currentIndex = 3; // Navigate to Spare Parts tab
+          });
+        },
       },
     ];
 
     return Column(
       children: [
         SizedBox(
-          height: 175,
+          height: 200,
           child: PageView.builder(
             itemCount: newsItems.length,
             controller: PageController(viewportFraction: 0.92),
@@ -697,26 +730,50 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 8),
                                 Text(
                                   news['title'] as String,
                                   style: GoogleFonts.poppins(
-                                    fontSize: 20,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
                                     height: 1.2,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
                                 Text(
                                   news['description'] as String,
                                   style: GoogleFonts.poppins(
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     color: Colors.white.withOpacity(0.9),
-                                    height: 1.4,
+                                    height: 1.3,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 10),
+                                // Action button
+                                GestureDetector(
+                                  onTap: news['onTap'] as VoidCallback?,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      news['buttonText'] as String,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: (news['gradient'] as List<Color>)
+                                            .first,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -804,11 +861,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Book Service Card
               _buildBookServiceCard(),
               const SizedBox(height: 20),
-              
+
               // My Bookings Section Title
               Text(
                 'My Bookings',
@@ -819,7 +876,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               // Tab Bar
               Container(
                 decoration: BoxDecoration(
@@ -947,7 +1004,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  Widget _buildBookingsList(List<Map<String, dynamic>> bookings, {required bool isHistory}) {
+  Widget _buildBookingsList(
+    List<Map<String, dynamic>> bookings, {
+    required bool isHistory,
+  }) {
     if (bookings.isEmpty) {
       return Center(
         child: Column(
@@ -972,10 +1032,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               isHistory
                   ? 'Your completed services will appear here'
                   : 'Book a service to get started',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
             ),
           ],
         ),
@@ -994,7 +1051,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  Widget _buildBookingCard(Map<String, dynamic> booking, {bool isHistory = false}) {
+  Widget _buildBookingCard(
+    Map<String, dynamic> booking, {
+    bool isHistory = false,
+  }) {
     final status = (booking['status'] ?? 'pending')
         .toString()
         .toLowerCase()
@@ -1200,7 +1260,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _showBookingDetailsDialog(booking, isHistory: isHistory),
+                  onPressed: () =>
+                      _showBookingDetailsDialog(booking, isHistory: isHistory),
                   icon: Icon(
                     isHistory ? Icons.history : Icons.visibility_outlined,
                     size: 18,
@@ -1213,8 +1274,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: isHistory ? Colors.teal : AppColors.primary,
-                    side: BorderSide(color: isHistory ? Colors.teal : AppColors.primary),
+                    foregroundColor: isHistory
+                        ? Colors.teal
+                        : AppColors.primary,
+                    side: BorderSide(
+                      color: isHistory ? Colors.teal : AppColors.primary,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1229,14 +1294,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  void _showBookingDetailsDialog(Map<String, dynamic> booking, {bool isHistory = false}) {
+  void _showBookingDetailsDialog(
+    Map<String, dynamic> booking, {
+    bool isHistory = false,
+  }) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BookingDetailsPage(
-          booking: booking,
-          fromHistory: isHistory,
-        ),
+        builder: (context) =>
+            BookingDetailsPage(booking: booking, fromHistory: isHistory),
       ),
     ).then((_) => _loadUserData()); // Refresh on return
   }
@@ -1343,6 +1409,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final color = vehicle['color'] ?? '';
     final transmission = vehicle['transmission'] ?? '';
     final fuelType = vehicle['fuelType'] ?? '';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () => _navigateToEditVehicle(vehicle),
@@ -1351,9 +1418,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
+          border: isDark
+              ? Border.all(color: Colors.white.withOpacity(0.1), width: 1)
+              : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: isDark
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -1426,7 +1498,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         value: 'delete',
                         child: Row(
                           children: [
-                            const Icon(Icons.delete, size: 18, color: Colors.red),
+                            const Icon(
+                              Icons.delete,
+                              size: 18,
+                              color: Colors.red,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'Delete',
@@ -1444,36 +1520,46 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (year.isNotEmpty) _buildInfoChip(Icons.calendar_today, year),
-                if (color.isNotEmpty) _buildInfoChip(Icons.palette, color),
-                if (transmission.isNotEmpty)
-                  _buildInfoChip(Icons.settings, transmission),
-                if (fuelType.isNotEmpty)
-                  _buildInfoChip(Icons.local_gas_station, fuelType),
-              ],
-            ),
-          ],
+                  if (year.isNotEmpty)
+                    _buildInfoChip(Icons.calendar_today, year),
+                  if (color.isNotEmpty) _buildInfoChip(Icons.palette, color),
+                  if (transmission.isNotEmpty)
+                    _buildInfoChip(Icons.settings, transmission),
+                  if (fuelType.isNotEmpty)
+                    _buildInfoChip(Icons.local_gas_station, fuelType),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 
   Widget _buildInfoChip(IconData icon, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? Colors.white.withOpacity(0.1) : Colors.grey[100],
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.grey[600]),
+          Icon(
+            icon,
+            size: 14,
+            color: isDark ? Colors.grey[400] : Colors.grey[600],
+          ),
           const SizedBox(width: 4),
           Text(
             label,
-            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[700]),
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: isDark ? Colors.grey[300] : Colors.grey[700],
+            ),
           ),
         ],
       ),
@@ -1555,6 +1641,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   /// ============ PROFILE TAB ============
   Widget _buildProfilePage() {
     final imageProvider = _getProfileImageProvider();
+    final loc = AppLocalizations.of(context);
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -1616,7 +1703,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             // Profile Options
             _buildProfileOption(
               icon: Icons.person_outline,
-              title: 'My Profile',
+              title: 'Profile',
               onTap: () async {
                 final result = await Navigator.push(
                   context,
@@ -1629,34 +1716,34 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
 
             // Preferences Section
-            _buildSectionLabel('Preferences'),
+            _buildSectionLabel(loc?.translate('preferences') ?? 'Preferences'),
             _buildProfileOption(
               icon: Icons.location_city_outlined,
-              title: 'State',
+              title: loc?.translate('state') ?? 'State',
               onTap: () {
                 _showStateSelectionDialog();
               },
             ),
             _buildProfileOption(
               icon: Icons.language_outlined,
-              title: 'Language',
+              title: loc?.translate('language') ?? 'Language',
               onTap: () {
                 _showLanguageSelectionDialog();
               },
             ),
             _buildProfileOption(
               icon: Icons.palette_outlined,
-              title: 'Appearance',
+              title: loc?.translate('appearance') ?? 'Appearance',
               onTap: () {
                 _showAppearanceDialog();
               },
             ),
 
             // More Section
-            _buildSectionLabel('More'),
+            _buildSectionLabel(loc?.translate('more') ?? 'More'),
             _buildProfileOption(
               icon: Icons.help_outline,
-              title: 'Help & Support',
+              title: loc?.translate('helpAndSupport') ?? 'Help & Support',
               onTap: () {
                 Navigator.push(
                   context,
@@ -1666,7 +1753,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             _buildProfileOption(
               icon: Icons.headset_mic_outlined,
-              title: 'Contact Us',
+              title: loc?.translate('contactUs') ?? 'Contact Us',
               onTap: () {
                 Navigator.push(
                   context,
@@ -1676,7 +1763,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             ),
             _buildProfileOption(
               icon: Icons.info_outline,
-              title: 'About',
+              title: loc?.translate('about') ?? 'About',
               onTap: () {
                 Navigator.push(
                   context,
@@ -1699,7 +1786,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       )
                     : const Icon(Icons.logout, color: Colors.red),
                 label: Text(
-                  'Sign Out',
+                  loc?.translate('signOut') ?? 'Sign Out',
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w500,
                     color: Colors.red,
@@ -1825,46 +1912,83 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   void _showLanguageSelectionDialog() {
-    final languages = [
-      {'name': 'English', 'code': 'en'},
-      {'name': 'Bahasa Malaysia', 'code': 'ms'},
-      {'name': '中文', 'code': 'zh'},
-    ];
+    final currentLocale = LocaleController.locale.value;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Select Language',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: languages.map((lang) {
-            return ListTile(
-              title: Text(lang['name']!, style: GoogleFonts.poppins()),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Language set to ${lang['name']}')),
-                );
-              },
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(
+                AppLocalizations.of(context)?.selectLanguage ??
+                    'Select Language',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildLanguageOption(
+                    name: 'English',
+                    code: 'en',
+                    isSelected: currentLocale.languageCode == 'en',
+                    onTap: () {
+                      LocaleController.setLocale(const Locale('en'));
+                      Navigator.pop(dialogContext);
+                    },
+                  ),
+                  _buildLanguageOption(
+                    name: '中文',
+                    code: 'zh',
+                    isSelected: currentLocale.languageCode == 'zh',
+                    onTap: () {
+                      LocaleController.setLocale(const Locale('zh'));
+                      Navigator.pop(dialogContext);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(
+                    AppLocalizations.of(context)?.cancel ?? 'Cancel',
+                    style: GoogleFonts.poppins(),
+                  ),
+                ),
+              ],
             );
-          }).toList(),
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLanguageOption({
+    required String name,
+    required String code,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: isSelected
+          ? const Icon(Icons.check_circle, color: AppColors.primary)
+          : const Icon(Icons.circle_outlined, color: Colors.grey),
+      title: Text(
+        name,
+        style: GoogleFonts.poppins(
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? AppColors.primary : null,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.poppins()),
-          ),
-        ],
       ),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     );
   }
 
   void _showAppearanceDialog() {
     final currentMode = ThemeController.themeMode.value;
-    
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1921,10 +2045,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? AppColors.primary : null,
-      ),
+      leading: Icon(icon, color: isSelected ? AppColors.primary : null),
       title: Text(
         title,
         style: GoogleFonts.poppins(
@@ -1941,6 +2062,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   /// ============ BOTTOM NAV BAR ============
   Widget _buildBottomNavBar() {
+    final loc = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
@@ -1958,26 +2080,36 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(0, Icons.home_outlined, Icons.home, 'Home'),
+              _buildNavItem(
+                0,
+                Icons.home_outlined,
+                Icons.home,
+                loc?.home ?? 'Home',
+              ),
               _buildNavItem(
                 1,
                 Icons.calendar_month_outlined,
                 Icons.calendar_month,
-                'Bookings',
+                loc?.bookings ?? 'Bookings',
               ),
               _buildNavItem(
                 2,
                 Icons.directions_car_outlined,
                 Icons.directions_car,
-                'Vehicles',
+                loc?.vehicles ?? 'Vehicles',
               ),
               _buildNavItem(
                 3,
                 Icons.build_outlined,
                 Icons.build,
-                'Parts',
+                loc?.parts ?? 'Parts',
               ),
-              _buildNavItem(4, Icons.person_outline, Icons.person, 'Me'),
+              _buildNavItem(
+                4,
+                Icons.person_outline,
+                Icons.person,
+                loc?.me ?? 'Me',
+              ),
             ],
           ),
         ),

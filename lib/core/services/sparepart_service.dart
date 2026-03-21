@@ -13,13 +13,16 @@ class SparePartService {
         final data = doc.data();
         return {
           'id': doc.id,
-          'part': data['part'] ?? '',
           'car_model': data['car_model'] ?? '',
           'description': data['description'] ?? '',
-          'price': data['price'] ?? 0,
+          'discountPercent': data['discountPercent'] ?? 0,
+          'imageUrl': data['imageUrl'] ?? '',
+          'onSale': data['onSale'] ?? false,
+          'originalPrice': data['originalPrice'] ?? data['price'] ?? 0,
+          'part': data['part'] ?? '',
+          'salePrice': data['salePrice'],
           'stock': data['stock'] ?? 0,
           'type': data['type'] ?? '',
-          'imageUrl': data['imageUrl'] ?? '',
         };
       }).toList();
     } catch (e) {
@@ -57,7 +60,10 @@ class SparePartService {
           'part': data['part'] ?? '',
           'car_model': data['car_model'] ?? '',
           'description': data['description'] ?? '',
-          'price': data['price'] ?? 0,
+          'discountPercent': data['discountPercent'] ?? 0,
+          'originalPrice': data['originalPrice'] ?? data['price'] ?? 0,
+          'salePrice': data['salePrice'],
+          'onSale': data['onSale'] ?? false,
           'stock': data['stock'] ?? 0,
           'type': data['type'] ?? '',
           'imageUrl': data['imageUrl'] ?? '',
