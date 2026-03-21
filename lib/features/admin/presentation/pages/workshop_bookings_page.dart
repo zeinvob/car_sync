@@ -318,6 +318,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
     ];
 
     String selectedStatus = currentStatus;
+    String? technicianError;
 
     String? selectedTechnicianId =
         (currentTechnicianId != null && currentTechnicianId.trim().isNotEmpty)
@@ -353,18 +354,19 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
       context: context,
       builder: (context) {
         final onSurface = Theme.of(context).colorScheme.onSurface;
-        return AlertDialog(
-          backgroundColor: Theme.of(context).dialogBackgroundColor,
-          title: Text(
-            'Update Booking',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              color: onSurface,
-            ),
-          ),
-          content: StatefulBuilder(
-            builder: (context, setDialogState) {
-              return SingleChildScrollView(
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).dialogBackgroundColor,
+              title: Text(
+                'Update Booking',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  color: onSurface,
+                ),
+              ),
+              content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -389,7 +391,12 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                       }).toList(),
                       onChanged: (value) {
                         if (value != null) {
-                          setDialogState(() => selectedStatus = value);
+                          setDialogState(() {
+                            selectedStatus = value;
+                            if (selectedStatus != 'confirmed') {
+                              technicianError = null;
+                            }
+                          });
                         }
                       },
                     ),
@@ -400,6 +407,7 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                       decoration: InputDecoration(
                         labelText: 'Assign Technician',
                         labelStyle: GoogleFonts.poppins(),
+                        errorText: technicianError,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -423,43 +431,47 @@ class _WorkshopBookingsPageState extends State<WorkshopBookingsPage> {
                         }),
                       ],
                       onChanged: (value) {
-                        setDialogState(() => selectedTechnicianId = value);
+                        setDialogState(() {
+                          selectedTechnicianId = value;
+                          technicianError = null;
+                        });
                       },
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.onSurface,
               ),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.poppins(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancel', style: GoogleFonts.poppins()),
                 ),
-              ),
-            ),
-            SizedBox(
-              width: 110,
-              child: GradientButton(
-                text: "Save",
-                height: 45,
-                borderRadius: 12,
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'status': selectedStatus,
-                    'technicianId': selectedTechnicianId,
-                  });
-                },
-              ),
-            ),
-          ],
+                SizedBox(
+                  width: 110,
+                  child: GradientButton(
+                    text: "Save",
+                    height: 45,
+                    borderRadius: 12,
+                    onPressed: () {
+                      if (selectedStatus == 'confirmed' &&
+                          (selectedTechnicianId == null ||
+                              selectedTechnicianId!.trim().isEmpty)) {
+                        setDialogState(() {
+                          technicianError =
+                              'Technician is required when status is Confirmed';
+                        });
+                        return;
+                      }
+
+                      Navigator.pop(context, {
+                        'status': selectedStatus,
+                        'technicianId': selectedTechnicianId,
+                      });
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
