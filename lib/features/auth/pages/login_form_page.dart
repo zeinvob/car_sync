@@ -1,5 +1,6 @@
 import 'package:car_sync/features/auth/pages/signup_page.dart';
 import 'package:car_sync/features/customer/pages/home.dart';
+import 'package:car_sync/features/technician/pages/home.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/services/auth_service.dart';
@@ -386,10 +387,11 @@ class _LoginFormPageState extends State<LoginFormPage> {
           );
         } else if (userRole == 'technician' || userRole == 'foreman') {
           // Navigate to Technician/Foreman Home Screen
-          /*Navigator.pushAndRemoveUntil(
+          Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-            (rout*/
+            MaterialPageRoute(builder: (context) => const TechnicianHome()),
+            (route) => false,
+          );
         } else {
           // Default to Customer Home Screen (includes 'customer' role and null)
           Navigator.pushAndRemoveUntil(

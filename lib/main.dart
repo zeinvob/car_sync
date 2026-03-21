@@ -8,6 +8,7 @@ import 'package:car_sync/features/customer/pages/home.dart';
 import 'package:car_sync/features/splash/pages/video_splash_scr.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/features/admin/presentation/admin_home_scr.dart';
+import 'package:car_sync/features/technician/pages/home.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/theme/theme_controller.dart';
 import 'package:car_sync/core/services/auth_nav_flag.dart';
@@ -192,9 +193,7 @@ class RoleBasedHomeLoader extends StatelessWidget {
         if (role == 'admin') {
           return const AdminThemeWrapper(child: AdminHomeScreen());
         } else if (role == 'technician' || role == 'foreman') {
-          SnackBar(
-              content:Text("no technician so far"),
-            );
+          return const TechnicianHome();
         } else {
           return const CustomerHomePage();
         }
