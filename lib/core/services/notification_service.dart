@@ -245,6 +245,56 @@ class NotificationService {
     );
   }
 
+  /// NEW: Create admin notification when technician changes booking status
+  /// This does not change any old method, so the shared service remains safe.
+  Future<void> createBookingStatusNotificationForAdmins({
+    required String bookingId,
+    required String workshopId,
+    required String workshopName,
+    required String customerName,
+    required String newStatus,
+    String? technicianName,
+  }) async {
+    String title;
+    String body;
+
+    switch (newStatus.toLowerCase()) {
+      case 'in_progress':
+        title = 'Service In Progress';
+        body =
+            '$customerName\'s booking at $workshopName is now in progress'
+            '${technicianName != null && technicianName.trim().isNotEmpty ? ' by $technicianName' : ''}.';
+        break;
+
+      case 'completed':
+        title = 'Service Completed';
+        body =
+            '$customerName\'s booking at $workshopName has been completed'
+            '${technicianName != null && technicianName.trim().isNotEmpty ? ' by $technicianName' : ''}.';
+        break;
+
+      default:
+        return;
+    }
+
+    await createNotification(
+      targetRole: 'admin',
+      type: 'admin_booking_status_update',
+      title: title,
+      body: body,
+      relatedBookingId: bookingId,
+      relatedWorkshopId: workshopId,
+      extraData: {
+        'bookingId': bookingId,
+        'workshopId': workshopId,
+        'workshopName': workshopName,
+        'customerName': customerName,
+        'newStatus': newStatus,
+        if (technicianName != null) 'technicianName': technicianName,
+      },
+    );
+  }
+
   /// Create a notification for customer when technician adds a repair update
   Future<void> createRepairUpdateNotificationForCustomer({
     required String customerId,
@@ -270,12 +320,9 @@ class NotificationService {
 
   // ======================== READ NOTIFICATIONS ========================
 
-  /// Get notifications stream for a specific user (customer)
   Stream<List<Map<String, dynamic>>> userNotificationsStream({
     required String userId,
   }) {
-    // Note: This query requires a composite index on (targetUserId, createdAt)
-    // If index is not ready, we fall back to client-side sorting
     return _notificationsCollection
         .where('targetUserId', isEqualTo: userId)
         .snapshots()
@@ -284,40 +331,47 @@ class NotificationService {
             final data = doc.data() as Map<String, dynamic>;
             return {'id': doc.id, ...data};
           }).toList();
-          
-          // Sort by createdAt on client side
+
           list.sort((a, b) {
             final aTime = a['createdAt'] as Timestamp?;
             final bTime = b['createdAt'] as Timestamp?;
             if (aTime == null && bTime == null) return 0;
             if (aTime == null) return 1;
             if (bTime == null) return -1;
-            return bTime.compareTo(aTime); // Descending
+            return bTime.compareTo(aTime);
           });
-          
+
           return list;
         });
   }
 
-  /// Get notifications stream by role (admin, workshop)
   Stream<List<Map<String, dynamic>>> notificationsStream({
     required String role,
   }) {
     return _notificationsCollection
         .where('targetRole', isEqualTo: role)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) {
+          final list = snapshot.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             return {'id': doc.id, ...data};
           }).toList();
+
+          list.sort((a, b) {
+            final aTime = a['createdAt'] as Timestamp?;
+            final bTime = b['createdAt'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime);
+          });
+
+          return list;
         });
   }
 
   // ======================== UNREAD COUNTS ========================
 
-  /// Get unread notification count for a specific user (customer)
   Stream<int> unreadUserNotificationCountStream({required String userId}) {
     return _notificationsCollection
         .where('targetUserId', isEqualTo: userId)
@@ -335,7 +389,6 @@ class NotificationService {
         });
   }
 
-  /// Get unread notification count by role
   Stream<int> unreadNotificationCountStream({
     required String role,
     required String currentUserId,
@@ -356,7 +409,6 @@ class NotificationService {
         });
   }
 
-  /// Get unread booking notification count by role
   Stream<int> unreadBookingNotificationCountStream({
     required String role,
     required String currentUserId,
@@ -393,7 +445,6 @@ class NotificationService {
     }
   }
 
-  /// Mark all user-specific notifications as read
   Future<void> markAllUserNotificationsAsRead({required String userId}) async {
     try {
       final snapshot = await _notificationsCollection
@@ -439,7 +490,6 @@ class NotificationService {
 
   // ======================== DELETE NOTIFICATIONS ========================
 
-  /// Delete a single notification by ID
   Future<void> deleteNotification(String notificationId) async {
     try {
       await _notificationsCollection.doc(notificationId).delete();
@@ -449,7 +499,6 @@ class NotificationService {
     }
   }
 
-  /// Delete all notifications for a specific user
   Future<void> deleteAllUserNotifications(String userId) async {
     try {
       final snapshot = await _notificationsCollection
@@ -467,7 +516,6 @@ class NotificationService {
     }
   }
 
-  /// Delete all read notifications for a specific user
   Future<void> deleteReadNotifications(String userId) async {
     try {
       final snapshot = await _notificationsCollection
