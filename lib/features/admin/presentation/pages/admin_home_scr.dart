@@ -1,22 +1,25 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:car_sync/core/constants/app_colors.dart';
+import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/core/services/booking_service.dart';
-import 'package:car_sync/core/services/user_service.dart';
+import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/services/sparepart_service.dart';
+import 'package:car_sync/core/services/user_service.dart';
 import 'package:car_sync/core/services/workshop_service.dart';
+import 'package:car_sync/core/theme/admin_theme_controller.dart';
+import 'package:car_sync/core/widgets/gradient_button.dart';
+import 'package:car_sync/features/admin/presentation/pages/admin_chat_inbox_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/admin_workshops_browser_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
+import 'package:car_sync/features/auth/pages/login_form_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:car_sync/core/widgets/gradient_button.dart';
-import 'package:car_sync/core/services/auth_service.dart';
-import 'package:car_sync/features/auth/pages/login_form_page.dart';
-import 'package:car_sync/core/theme/theme_controller.dart';
-import 'package:car_sync/features/admin/presentation/pages/admin_profile_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:car_sync/core/services/notification_service.dart';
-import 'package:car_sync/features/admin/presentation/pages/notifications_page.dart';
-import 'package:car_sync/core/theme/admin_theme_controller.dart';
-import 'dart:async';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -25,46 +28,43 @@ class AdminHomeScreen extends StatefulWidget {
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
 }
 
-class _AdminHomeScreenState extends State<AdminHomeScreen> {
+class _AdminHomeScreenState extends State<AdminHomeScreen>
+    with WidgetsBindingObserver {
   final NotificationService _notificationService = NotificationService.instance;
-  int _activeBookingsCount = 0;
-  StreamSubscription<int>? _activeBookingsSubscription;
-  int _unreadNotificationCount = 0;
-  int _unreadBookingCount = 0;
-  StreamSubscription<int>? _notificationCountSubscription;
-  StreamSubscription<int>? _bookingCountSubscription;
   final BookingService _bookingService = BookingService();
   final UserService _userService = UserService();
   final SparePartService _sparePartService = SparePartService();
   final WorkshopService _workshopService = WorkshopService();
   final AuthService _authService = AuthService();
+
+  int _activeBookingsCount = 0;
+  int _unreadNotificationCount = 0;
+  int _unreadBookingCount = 0;
+  int _unreadChatCount = 0;
+
+  StreamSubscription<int>? _activeBookingsSubscription;
+  StreamSubscription<int>? _notificationCountSubscription;
+  StreamSubscription<int>? _bookingCountSubscription;
+  StreamSubscription<int>? _chatCountSubscription;
+
   bool _isSigningOut = false;
+  bool _isLoadingAdmin = true;
   int _selectedIndex = 0;
+
   String _adminName = 'Admin';
   String _adminEmail = '';
-  bool _isLoadingAdmin = true;
+  String _adminProfileImageUrl = '';
+  Timer? _chatRefreshTimer;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  void _listenToActiveBookingsCount() {
-    _activeBookingsSubscription?.cancel();
-
-    _activeBookingsSubscription = _bookingService
-        .getActiveBookingsCountStream()
-        .listen((count) {
-          if (mounted) {
-            setState(() {
-              _activeBookingsCount = count;
-            });
-          }
-        });
-  }
 
   @override
   void initState() {
     super.initState();
     _listenToNotificationCounts();
     _listenToActiveBookingsCount();
+    _listenToUnreadChatCount();
+    _startChatCountAutoRefresh();
 
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -82,17 +82,118 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     _notificationCountSubscription?.cancel();
     _bookingCountSubscription?.cancel();
     _activeBookingsSubscription?.cancel();
+    _chatCountSubscription?.cancel();
+    _chatRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _listenToUnreadChatCount();
+    }
+  }
+
+  void _listenToActiveBookingsCount() {
+    _activeBookingsSubscription?.cancel();
+
+    _activeBookingsSubscription = _bookingService
+        .getActiveBookingsCountStream()
+        .listen((count) {
+          if (mounted) {
+            setState(() {
+              _activeBookingsCount = count;
+            });
+          }
+        });
+  }
+
+  void _listenToNotificationCounts() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _notificationCountSubscription?.cancel();
+    _bookingCountSubscription?.cancel();
+
+    _notificationCountSubscription = _notificationService
+        .unreadNotificationCountStream(role: 'admin', currentUserId: user.uid)
+        .listen((count) {
+          if (mounted) {
+            setState(() {
+              _unreadNotificationCount = count;
+            });
+          }
+        });
+
+    _bookingCountSubscription = _notificationService
+        .unreadBookingNotificationCountStream(
+          role: 'admin',
+          currentUserId: user.uid,
+        )
+        .listen((count) {
+          if (mounted) {
+            setState(() {
+              _unreadBookingCount = count;
+            });
+          }
+        });
+  }
+
+  void _listenToUnreadChatCount() {
+    _chatCountSubscription?.cancel();
+
+    _chatCountSubscription = _workshopService
+        .unreadCustomerMessagesCountStream()
+        .listen(
+          (count) {
+            debugPrint('Live unread chat count: $count');
+            if (mounted) {
+              setState(() {
+                _unreadChatCount = count;
+              });
+            }
+          },
+          onError: (error) {
+            debugPrint('Unread chat stream error: $error');
+          },
+        );
+  }
+
+  Future<void> _refreshUnreadChatCountOnce() async {
+    try {
+      final count = await _workshopService.getUnreadCustomerMessagesCountOnce();
+
+      if (mounted) {
+        setState(() {
+          _unreadChatCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint('Refresh unread chat count failed: $e');
+    }
+  }
+
+  void _startChatCountAutoRefresh() {
+    _chatRefreshTimer?.cancel();
+
+    _chatRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _refreshUnreadChatCountOnce();
+    });
+  }
+
   Future<void> _loadAdminData() async {
-    setState(() => _isLoadingAdmin = true);
+    if (mounted) {
+      setState(() => _isLoadingAdmin = true);
+    }
 
     try {
       final user = FirebaseAuth.instance.currentUser;
 
       if (user != null) {
-      final userData = await _userService.getUserData(user.uid);
+        final userData = await _userService.getUserData(user.uid);
+
+        if (!mounted) return;
 
         setState(() {
           _adminName =
@@ -101,7 +202,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               userData?['username'] ??
               user.displayName ??
               'Admin';
+
           _adminEmail = userData?['email'] ?? user.email ?? '';
+
+          _adminProfileImageUrl = (userData?['profileImageUrl'] ?? '')
+              .toString();
         });
       }
     } catch (e) {
@@ -117,7 +222,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Widget build(BuildContext context) {
     final pages = [
       _buildHomePage(),
-      const _SimplePage(title: "Bookings Page"),
+      const AdminWorkshopsBrowserPage(),
       const _SimplePage(title: "Services Page"),
       const _SimplePage(title: "Stock Page"),
       const _SimplePage(title: "Parts Order Page"),
@@ -125,7 +230,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     return PopScope(
       canPop: _selectedIndex == 0,
-      // ignore: deprecated_member_use
       onPopInvoked: (didPop) {
         if (didPop) return;
 
@@ -165,19 +269,30 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildWelcomeBanner(),
-                  const SizedBox(height: 20),
-                  _buildSectionTitle("QUICK ACTIONS"),
+                  const SizedBox(height: 18),
+                  _buildDashboardStats(),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(
+                    "Quick Actions",
+                    subtitle: "Manage your workshop faster",
+                  ),
                   const SizedBox(height: 12),
                   _buildQuickActions(),
                   const SizedBox(height: 24),
-                  _buildSectionTitle("RECENTLY ADDED"),
+                  _buildSectionHeader(
+                    "Recently Added Parts",
+                    subtitle: "Latest inventory items in stock",
+                  ),
                   const SizedBox(height: 12),
                   _buildRecentlyAddedSection(),
                   const SizedBox(height: 24),
-                  _buildSectionTitle("WORKSHOP"),
+                  _buildSectionHeader(
+                    "Workshop Overview",
+                    subtitle: "View all available workshops",
+                  ),
                   const SizedBox(height: 12),
                   _buildWorkshopSection(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                 ],
               ),
             ),
@@ -206,13 +321,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Drawer menu button
           IconButton(
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             icon: const Icon(Icons.menu, color: Colors.white, size: 30),
           ),
-
-          // App logo in the center
           Expanded(
             child: Center(
               child: Image.asset(
@@ -222,8 +334,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ),
           ),
-
-          // Notification button on the right
           Container(
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
@@ -296,7 +406,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // Drawer title
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
               child: Text(
@@ -307,10 +416,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
             ),
-
             const Divider(height: 1),
-
-            // Profile section
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: Text(
@@ -327,18 +433,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       overflow: TextOverflow.ellipsis,
                     )
                   : null,
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                Navigator.push(
+                final updated = await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AdminProfilePage()),
                 );
+
+                if (updated == true) {
+                  _loadAdminData();
+                }
               },
             ),
-
             const Divider(height: 1),
-
-            // Theme switch
             ValueListenableBuilder<bool>(
               valueListenable: AdminThemeController.isDark,
               builder: (context, isDark, _) {
@@ -357,10 +464,62 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 );
               },
             ),
-
             const Divider(height: 1),
+            ListTile(
+              leading: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.chat_bubble_outline_rounded),
+                  if (_unreadChatCount > 0)
+                    Positioned(
+                      right: -8,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          _unreadChatCount > 99 ? '99+' : '$_unreadChatCount',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              title: Text(
+                "Customer Chats",
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
 
-            // Sign out option
+                final changed = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminChatInboxPage()),
+                );
+
+                if (changed == true) {
+                  await _refreshUnreadChatCountOnce();
+                }
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.logout),
               title: Text(
@@ -384,108 +543,393 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Widget _buildWelcomeBanner() {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      height: 180,
-      width: double.infinity,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
           colors: [AppColors.gradientStart, AppColors.gradientEnd],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.22),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: Opacity(
-                opacity: 0.22,
-                child: Image.network(
-                  "https://images.unsplash.com/photo-1503376780353-7e6692767b70",
-                  fit: BoxFit.cover,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.network(
+                "https://images.unsplash.com/photo-1503376780353-7e6692767b70",
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF0D1B4C).withOpacity(0.88),
+                      AppColors.gradientStart.withOpacity(0.72),
+                      AppColors.gradientEnd.withOpacity(0.99),
+                    ],
+                    stops: const [0.0, 0.55, 1.0],
+                  ),
                 ),
               ),
             ),
-          ),
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                color: Colors.black.withOpacity(0.12),
+            Positioned(
+              right: -20,
+              top: -15,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  shape: BoxShape.circle,
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.25)),
-                  ),
-                  child: Center(
-                    child: Text(
-                      _adminName.isNotEmpty ? _adminName[0].toUpperCase() : 'A',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+            Positioned(
+              right: 30,
+              bottom: -25,
+              child: Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.25),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: _adminProfileImageUrl.trim().isNotEmpty
+                              ? Builder(
+                                  builder: (context) {
+                                    try {
+                                      return Image.memory(
+                                        base64Decode(_adminProfileImageUrl),
+                                        fit: BoxFit.cover,
+                                      );
+                                    } catch (e) {
+                                      return Center(
+                                        child: Text(
+                                          _adminName.isNotEmpty
+                                              ? _adminName[0].toUpperCase()
+                                              : 'A',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                )
+                              : Center(
+                                  child: Text(
+                                    _adminName.isNotEmpty
+                                        ? _adminName[0].toUpperCase()
+                                        : 'A',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                        ),
                       ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: _isLoadingAdmin
+                            ? const SizedBox(
+                                height: 26,
+                                width: 26,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _getGreeting(),
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _adminName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.16),
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.20),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      "Admin Dashboard",
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    "Manage bookings, spare parts, stock, and workshop activity from one place.",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white.withOpacity(0.92),
+                      fontSize: 13,
+                      height: 1.5,
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _isLoadingAdmin
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _getGreeting(),
-                              style: GoogleFonts.poppins(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _adminName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "Welcome back! Manage bookings, services, stock, and parts easily.",
-                              style: GoogleFonts.poppins(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 12.5,
-                              ),
-                            ),
-                          ],
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildHeroMiniStat(
+                          title: "Bookings",
+                          value: "$_activeBookingsCount",
+                          icon: Icons.calendar_today_rounded,
                         ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildHeroMiniStat(
+                          title: "Alerts",
+                          value: "$_unreadNotificationCount",
+                          icon: Icons.notifications_active_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroMiniStat({
+    required String title,
+    required String value,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.20)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white.withOpacity(0.85),
+                    fontSize: 11,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardStats() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatCard(
+              title: "Active",
+              value: "$_activeBookingsCount",
+              icon: Icons.receipt_long_rounded,
+              color: Colors.blue,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildStatCard(
+              title: "Chats",
+              value: "$_unreadChatCount",
+              icon: Icons.chat_bubble_outline_rounded,
+              color: Colors.deepPurple,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    final cardColor = Theme.of(context).cardColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: onSurface.withOpacity(0.06)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: onSurface.withOpacity(0.65),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, {String? subtitle}) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              color: onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: GoogleFonts.poppins(
+                color: onSurface.withOpacity(0.60),
+                fontSize: 12,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -496,23 +940,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     if (hour < 12) return 'Good Morning 👋';
     if (hour < 17) return 'Good Afternoon 👋';
     return 'Good Evening 👋';
-  }
-
-  Widget _buildSectionTitle(String title) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Text(
-        title,
-        style: GoogleFonts.poppins(
-          color: onSurface,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
   }
 
   Widget _buildQuickActions() {
@@ -576,10 +1003,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         setState(() => _selectedIndex = 1);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -587,39 +1014,49 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               offset: const Offset(0, 4),
             ),
           ],
+          border: Border.all(color: onSurface.withOpacity(0.06)),
         ),
         child: Stack(
           children: [
-            Align(
-              alignment: Alignment.center,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withOpacity(0.20),
+                        AppColors.primary.withOpacity(0.08),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.calendar_month_outlined,
-                      color: AppColors.primary,
-                      size: 26,
-                    ),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Bookings',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: onSurface,
-                    ),
+                  child: const Icon(
+                    Icons.calendar_month_rounded,
+                    color: AppColors.primary,
+                    size: 26,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Bookings',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Track workshop jobs',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: onSurface.withOpacity(0.60),
+                  ),
+                ),
+              ],
             ),
             if (_activeBookingsCount > 0)
               Positioned(
@@ -633,17 +1070,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.22),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
                   ),
                   child: Text(
                     _activeBookingsCount > 99 ? '99+' : '$_activeBookingsCount',
@@ -672,11 +1100,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -684,26 +1113,37 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               offset: const Offset(0, 4),
             ),
           ],
+          border: Border.all(color: onSurface.withOpacity(0.06)),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [color.withOpacity(0.20), color.withOpacity(0.10)],
+                ),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(icon, color: color, size: 26),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             Text(
               label,
-              textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
                 color: onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "Open and manage",
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: onSurface.withOpacity(0.60),
               ),
             ),
           ],
@@ -730,7 +1170,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         }
 
         return SizedBox(
-          height: 290,
+          height: 315,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
@@ -743,6 +1183,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 subtitle: item['car_model'] ?? 'No Model',
                 price: "RM ${item['price'] ?? 0}",
                 stock: item['stock'] ?? 0,
+                imageUrl: (item['imageUrl'] ?? '').toString(),
                 onTap: () {},
               );
             },
@@ -770,7 +1211,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         }
 
         return SizedBox(
-          height: 275,
+          height: 310,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
@@ -808,108 +1249,161 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     required String subtitle,
     required String price,
     required int stock,
+    required String imageUrl,
     required VoidCallback onTap,
   }) {
     final cardColor = Theme.of(context).cardColor;
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     final lowStock = stock <= 5;
+    final hasImage = imageUrl.trim().isNotEmpty;
 
     return Container(
-      width: 195,
+      width: 205,
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            height: 110,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: onSurface.withOpacity(0.06),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(22),
+                ),
+                child: Container(
+                  height: 125,
+                  width: double.infinity,
+                  color: onSurface.withOpacity(0.06),
+                  child: hasImage
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(
+                                Icons.build_circle_outlined,
+                                size: 46,
+                                color: AppColors.primary,
+                              ),
+                            );
+                          },
+                        )
+                      : const Center(
+                          child: Icon(
+                            Icons.build_circle_outlined,
+                            size: 46,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                ),
               ),
-            ),
-            child: const Icon(
-              Icons.build_circle_outlined,
-              size: 46,
-              color: AppColors.primary,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-            child: Column(
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    color: onSurface.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: onSurface.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(10),
+                    color: lowStock
+                        ? Colors.red.withOpacity(0.92)
+                        : Colors.black.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    lowStock ? "Low Stock: $stock" : "Stock: $stock",
+                    lowStock ? "Low Stock" : "Available",
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: lowStock ? Colors.red : onSurface,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  price,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const Spacer(),
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.all(10),
-            child: GradientButton(
-              text: "Add",
-              height: 45,
-              borderRadius: 12,
-              onPressed: onTap,
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      height: 1.4,
+                      color: onSurface.withOpacity(0.68),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: onSurface.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          "Stock: $stock",
+                          style: GoogleFonts.poppins(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: lowStock ? Colors.red : onSurface,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        price,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: GradientButton(
+                      text: "Add",
+                      height: 42,
+                      borderRadius: 12,
+                      onPressed: onTap,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -928,134 +1422,117 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return Container(
-      width: 195,
+      width: 210,
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: Container(
-              height: 110,
-              width: double.infinity,
-              color: onSurface.withOpacity(0.06),
-              child: imageUrl.trim().isNotEmpty
-                  ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: 110,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(22),
+                ),
+                child: Container(
+                  height: 125,
+                  width: double.infinity,
+                  color: onSurface.withOpacity(0.06),
+                  child: imageUrl.trim().isNotEmpty
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(
+                                Icons.garage_outlined,
+                                size: 46,
+                                color: AppColors.primary,
+                              ),
+                            );
+                          },
+                        )
+                      : const Center(
                           child: Icon(
                             Icons.garage_outlined,
                             size: 46,
                             color: AppColors.primary,
                           ),
-                        );
-                      },
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const Center(
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        );
-                      },
-                    )
-                  : const Center(
-                      child: Icon(
-                        Icons.garage_outlined,
-                        size: 46,
-                        color: AppColors.primary,
-                      ),
-                    ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.left,
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    color: onSurface.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.center,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF3E0),
-                      borderRadius: BorderRadius.circular(08),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFE67E22).withOpacity(0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
                         ),
-                      ],
-                      border: Border.all(
-                        color: const Color(0xFFFFCC80),
-                        width: 0.8,
-                      ),
-                    ),
-                    child: Text(
-                      "$bookingCount bookings",
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFFE67E22),
-                      ),
+                ),
+              ),
+              Positioned(
+                right: 10,
+                top: 10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    "$bookingCount bookings",
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-            child: GradientButton(
-              text: "Open",
-              height: 45,
-              borderRadius: 12,
-              onPressed: onTap,
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      height: 1.4,
+                      color: onSurface.withOpacity(0.68),
+                    ),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: GradientButton(
+                      text: "Open",
+                      height: 42,
+                      borderRadius: 12,
+                      onPressed: onTap,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -1233,38 +1710,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     } finally {
       if (mounted) setState(() => _isSigningOut = false);
     }
-  }
-
-  // Notification handling
-  void _listenToNotificationCounts() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    _notificationCountSubscription?.cancel();
-    _bookingCountSubscription?.cancel();
-
-    _notificationCountSubscription = _notificationService
-        .unreadNotificationCountStream(role: 'admin', currentUserId: user.uid)
-        .listen((count) {
-          if (mounted) {
-            setState(() {
-              _unreadNotificationCount = count;
-            });
-          }
-        });
-
-    _bookingCountSubscription = _notificationService
-        .unreadBookingNotificationCountStream(
-          role: 'admin',
-          currentUserId: user.uid,
-        )
-        .listen((count) {
-          if (mounted) {
-            setState(() {
-              _unreadBookingCount = count;
-            });
-          }
-        });
   }
 }
 

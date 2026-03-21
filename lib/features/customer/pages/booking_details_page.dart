@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -1172,7 +1174,7 @@ class _ChatDialogState extends State<_ChatDialog> {
         senderId: user.uid,
         senderName: userName,
         senderRole: 'customer',
-        imageUrl: imageBase64,  // Store base64 string
+        imageUrl: imageBase64, // Store base64 string
       );
     } catch (e) {
       if (mounted) {
@@ -1242,38 +1244,67 @@ class _ChatDialogState extends State<_ChatDialog> {
                 ),
               ),
               child: messageType == 'image' && imageUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        imageUrl,
-                        width: 180,
-                        height: 180,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return SizedBox(
-                            width: 180,
-                            height: 180,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value: progress.expectedTotalBytes != null
-                                    ? progress.cumulativeBytesLoaded /
-                                          progress.expectedTotalBytes!
-                                    : null,
+                  ? Builder(
+                      builder: (context) {
+                        final imageData = imageUrl.toString().trim();
+
+                        try {
+                          final decodedBytes = base64Decode(imageData);
+
+                          return GestureDetector(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => Dialog(
+                                  backgroundColor: Colors.transparent,
+                                  child: Stack(
+                                    children: [
+                                      InteractiveViewer(
+                                        child: Image.memory(
+                                          decodedBytes,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 10,
+                                        right: 10,
+                                        child: IconButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          icon: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 30,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.memory(
+                                decodedBytes,
+                                width: 180,
+                                height: 180,
+                                fit: BoxFit.cover,
                               ),
                             ),
                           );
-                        },
-                        errorBuilder: (context, error, stack) => Container(
-                          width: 180,
-                          height: 100,
-                          color: Colors.grey.shade300,
-                          child: const Icon(
-                            Icons.broken_image,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
+                        } catch (_) {
+                          return Container(
+                            width: 180,
+                            height: 100,
+                            color: Colors.grey.shade300,
+                            child: const Icon(
+                              Icons.broken_image,
+                              color: Colors.grey,
+                            ),
+                          );
+                        }
+                      },
                     )
                   : Text(
                       text,
@@ -1319,11 +1350,13 @@ class _ChatDialogState extends State<_ChatDialog> {
           .doc(widget.bookingId)
           .collection('messages')
           .add({
+            'type': 'text',
             'text': text,
             'senderId': user.uid,
             'senderName': userName,
             'senderRole': 'customer',
             'createdAt': FieldValue.serverTimestamp(),
+            'isReadByAdmin': false,
           });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

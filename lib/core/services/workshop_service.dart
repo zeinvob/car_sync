@@ -187,6 +187,7 @@ class WorkshopService {
         'notes': data['notes'] ?? '',
         'createdAt': data['createdAt'],
         'updatedAt': data['updatedAt'],
+        'statusHistory': data['statusHistory'] ?? {},
       });
     }
 
@@ -200,21 +201,28 @@ class WorkshopService {
     String? technicianId,
   }) async {
     // Get booking details before updating
-    final bookingDoc = await _firestore
-        .collection('bookings')
-        .doc(bookingId)
-        .get();
+    final bookingRef = _firestore.collection('bookings').doc(bookingId);
+    final bookingDoc = await bookingRef.get();
     final bookingData = bookingDoc.data();
 
-    // Update the booking
-    await _firestore.collection('bookings').doc(bookingId).update({
+    final currentStatusHistory = Map<String, dynamic>.from(
+      bookingData?['statusHistory'] ?? {},
+    );
+
+    final updateData = <String, dynamic>{
       'status': newStatus,
       'assignedTechnicianId':
           (technicianId != null && technicianId.trim().isNotEmpty)
           ? technicianId
           : '',
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+
+    if (!currentStatusHistory.containsKey(newStatus)) {
+      updateData['statusHistory.$newStatus'] = FieldValue.serverTimestamp();
+    }
+
+    await bookingRef.update(updateData);
 
     // Send notification to customer
     if (bookingData != null) {
@@ -222,20 +230,20 @@ class WorkshopService {
       final workshopName =
           bookingData['workshopName']?.toString() ?? 'Workshop';
 
-      // Get technician name if assigned
       String? technicianName;
       if (technicianId != null && technicianId.trim().isNotEmpty) {
         technicianName = await getTechnicianName(technicianId);
       }
 
       if (customerId.isNotEmpty) {
-        await NotificationService.instance.createBookingStatusNotificationForCustomer(
-          customerId: customerId,
-          bookingId: bookingId,
-          workshopName: workshopName,
-          newStatus: newStatus,
-          technicianName: technicianName,
-        );
+        await NotificationService.instance
+            .createBookingStatusNotificationForCustomer(
+              customerId: customerId,
+              bookingId: bookingId,
+              workshopName: workshopName,
+              newStatus: newStatus,
+              technicianName: technicianName,
+            );
       }
     }
   }
@@ -321,4 +329,132 @@ class WorkshopService {
   }
 
   /// -------------------------------------------------------------------------- ADMIN WORKSHOP SERVICE
+  ///
+  Stream<int> unreadCustomerMessagesCountStream() {
+    return _firestore
+        .collectionGroup('messages')
+        .where('senderRole', isEqualTo: 'customer')
+        .where('isReadByAdmin', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  Future<List<Map<String, dynamic>>> getAllActiveBookingsForChat() async {
+    final bookingSnapshot = await _firestore.collection('bookings').get();
+
+    List<Map<String, dynamic>> bookingsWithCustomer = [];
+
+    for (final doc in bookingSnapshot.docs) {
+      final data = doc.data();
+      final status = (data['status'] ?? '').toString().toLowerCase();
+
+      if (status == 'completed' || status == 'cancelled') continue;
+
+      final customerId = (data['customerId'] ?? '').toString();
+      final vehicleId = (data['vehicleId'] ?? '').toString();
+
+      Map<String, dynamic> customerData = {};
+      Map<String, dynamic> vehicleData = {};
+
+      if (customerId.isNotEmpty) {
+        final customerDoc = await _firestore
+            .collection('users')
+            .doc(customerId)
+            .get();
+        if (customerDoc.exists) {
+          customerData = customerDoc.data() ?? {};
+        }
+      }
+
+      if (vehicleId.isNotEmpty) {
+        final vehicleDoc = await _firestore
+            .collection('vehicles')
+            .doc(vehicleId)
+            .get();
+        if (vehicleDoc.exists) {
+          vehicleData = vehicleDoc.data() ?? {};
+        }
+      }
+
+      final brand = (vehicleData['brand'] ?? '').toString();
+      final model = (vehicleData['model'] ?? '').toString();
+      final plateNumber =
+          (vehicleData['plateNumber'] ?? vehicleData['plateNo'] ?? '')
+              .toString();
+
+      final vehicleDisplay = [
+        if (brand.isNotEmpty) brand,
+        if (model.isNotEmpty) model,
+        if (plateNumber.isNotEmpty) plateNumber,
+      ].join(' • ');
+
+      Map<String, dynamic> workshopData = {};
+
+      final workshopId = (data['workshopId'] ?? '').toString();
+      if (workshopId.isNotEmpty) {
+        final workshopDoc = await _firestore
+            .collection('workshops')
+            .doc(workshopId)
+            .get();
+        if (workshopDoc.exists) {
+          workshopData = workshopDoc.data() ?? {};
+        }
+      }
+
+      bookingsWithCustomer.add({
+        'id': doc.id,
+        'customerId': customerId,
+        'customerName':
+            customerData['name'] ??
+            customerData['fullName'] ??
+            customerData['username'] ??
+            'Unknown Customer',
+        'customerPhone':
+            customerData['phone'] ??
+            customerData['contact'] ??
+            customerData['phoneNumber'] ??
+            'No contact',
+        'customerEmail': customerData['email'] ?? 'No email',
+        'serviceType': data['serviceType'] ?? '',
+        'status': data['status'] ?? '',
+        'workshopId': data['workshopId'] ?? '',
+        'assignedTechnicianId': data['assignedTechnicianId'] ?? '',
+        'bookingDate': data['bookingDate'],
+        'vehicleId': vehicleId,
+        'vehicleDisplay': vehicleDisplay,
+        'notes': data['notes'] ?? '',
+        'createdAt': data['createdAt'],
+        'updatedAt': data['updatedAt'],
+      });
+    }
+
+    return bookingsWithCustomer;
+  }
+
+
+
+  Future<int> getUnreadCustomerMessagesCountOnce() async {
+  int totalUnread = 0;
+
+  final snapshot = await _firestore.collection('bookings').get();
+
+  for (final bookingDoc in snapshot.docs) {
+    final data = bookingDoc.data();
+    final status = (data['status'] ?? '').toString().toLowerCase();
+
+    if (status == 'completed' || status == 'cancelled') continue;
+
+    final messagesSnapshot = await _firestore
+        .collection('bookings')
+        .doc(bookingDoc.id)
+        .collection('messages')
+        .where('senderRole', isEqualTo: 'customer')
+        .where('isReadByAdmin', isEqualTo: false)
+        .get();
+
+    totalUnread += messagesSnapshot.docs.length;
+  }
+
+  return totalUnread;
+}
 }
