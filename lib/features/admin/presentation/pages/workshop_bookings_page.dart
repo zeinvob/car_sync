@@ -9,7 +9,7 @@ import 'package:car_sync/core/services/image_picker_service.dart';
 import 'package:car_sync/core/services/location_service.dart';
 import 'package:car_sync/core/services/workshop_service.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
-import 'package:car_sync/features/admin/presentation/pages/workshop_booking_progress_page.dart';
+import 'package:car_sync/features/admin/presentation/widgets/workshop_booking_progress.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
