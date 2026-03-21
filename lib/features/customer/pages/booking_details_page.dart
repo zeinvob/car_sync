@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car_sync/core/constants/app_colors.dart';
-import 'package:car_sync/features/customer/pages/customer_support_chat_page.dart';
+import 'package:car_sync/core/services/chat_service.dart';
+import 'package:car_sync/core/services/image_picker_service.dart';
+import 'package:car_sync/core/services/file_upload_service.dart';
 
 class BookingDetailsPage extends StatefulWidget {
   final Map<String, dynamic> booking;
@@ -933,21 +938,431 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   }
 
   void _showChatDialog(BuildContext context, String bookingId) {
-    // Get booking info for context
-    final serviceName = widget.booking['serviceName'] ?? 'Service';
-    final workshopName = widget.booking['workshopName'] ?? '';
-    
-    final initialMessage = workshopName.isNotEmpty
-        ? 'Hi, I have a question about my booking: $serviceName at $workshopName'
-        : 'Hi, I have a question about my booking: $serviceName';
+    showDialog(
+      context: context,
+      builder: (context) =>
+          _ChatDialog(bookingId: bookingId, firestore: _firestore),
+    );
+  }
+}
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CustomerSupportChatPage(
-          initialContext: initialMessage,
+class _ChatDialog extends StatefulWidget {
+  final String bookingId;
+  final FirebaseFirestore firestore;
+
+  const _ChatDialog({required this.bookingId, required this.firestore});
+
+  @override
+  State<_ChatDialog> createState() => _ChatDialogState();
+}
+
+class _ChatDialogState extends State<_ChatDialog> {
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final ChatService _chatService = ChatService();
+  final ImagePickerService _imagePickerService = ImagePickerService();
+  final FileUploadService _fileUploadService = FileUploadService();
+  bool _isSendingImage = false;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.6,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.chat_bubble_outline,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Chat with Admin',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            // Messages
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: widget.firestore
+                    .collection('bookings')
+                    .doc(widget.bookingId)
+                    .collection('messages')
+                    .orderBy('createdAt', descending: false)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 48,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No messages yet',
+                            style: GoogleFonts.poppins(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Send a message to the admin',
+                            style: GoogleFonts.poppins(
+                              color: Colors.grey[400],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final messages = snapshot.data!.docs;
+
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_scrollController.hasClients) {
+                      _scrollController.animateTo(
+                        _scrollController.position.maxScrollExtent,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      );
+                    }
+                  });
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message =
+                          messages[index].data() as Map<String, dynamic>;
+                      final isMe =
+                          message['senderId'] ==
+                          FirebaseAuth.instance.currentUser?.uid;
+                      return _buildMessageBubble(message, isMe);
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Input
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _messageController,
+                    decoration: InputDecoration(
+                      hintText: 'Type a message...',
+                      hintStyle: GoogleFonts.poppins(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                    ),
+                    style: GoogleFonts.poppins(fontSize: 14),
+                    textCapitalization: TextCapitalization.sentences,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // Image attachment button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: _isSendingImage ? null : _pickAndSendImage,
+                    icon: _isSendingImage
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            Icons.image,
+                            color: Colors.grey.shade700,
+                            size: 20,
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: _sendMessage,
+                    icon: const Icon(Icons.send, color: Colors.white, size: 18),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  Future<void> _pickAndSendImage() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final file = await _imagePickerService.pickFromGallery(
+      maxWidth: 400,
+      quality: 60,
+    );
+    if (file == null) return;
+
+    setState(() => _isSendingImage = true);
+
+    try {
+      final userDoc = await widget.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final userData = userDoc.data() ?? {};
+      final userName = userData['fullName'] ?? userData['name'] ?? 'Customer';
+
+      final imageBase64 = await _fileUploadService.imageToBase64(file);
+
+      await _chatService.sendImageMessage(
+        bookingId: widget.bookingId,
+        senderId: user.uid,
+        senderName: userName,
+        senderRole: 'customer',
+        imageUrl: imageBase64,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSendingImage = false);
+    }
+  }
+
+  Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
+    final text = message['text'] ?? '';
+    final senderName = message['senderName'] ?? 'Unknown';
+    final senderRole = message['senderRole'] ?? '';
+    final messageType = message['type'] ?? 'text';
+    final imageUrl = message['imageUrl'];
+
+    String timeStr = '';
+    if (message['createdAt'] != null) {
+      try {
+        final date = (message['createdAt'] as Timestamp).toDate();
+        timeStr =
+            '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      } catch (_) {}
+    }
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.55,
+        ),
+        child: Column(
+          crossAxisAlignment: isMe
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            if (!isMe)
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 2),
+                child: Text(
+                  '$senderName ${senderRole.isNotEmpty ? '($senderRole)' : ''}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            Container(
+              padding: messageType == 'image'
+                  ? const EdgeInsets.all(4)
+                  : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isMe ? AppColors.primary : Colors.grey.shade100,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(14),
+                  topRight: const Radius.circular(14),
+                  bottomLeft: Radius.circular(isMe ? 14 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 14),
+                ),
+              ),
+              child: messageType == 'image' && imageUrl != null
+                  ? Builder(
+                      builder: (context) {
+                        final imageData = imageUrl.toString().trim();
+
+                        try {
+                          final decodedBytes = base64Decode(imageData);
+
+                          return GestureDetector(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => Dialog(
+                                  backgroundColor: Colors.transparent,
+                                  child: Stack(
+                                    children: [
+                                      InteractiveViewer(
+                                        child: Image.memory(
+                                          decodedBytes,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 10,
+                                        right: 10,
+                                        child: IconButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          icon: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 30,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.memory(
+                                decodedBytes,
+                                width: 180,
+                                height: 180,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          );
+                        } catch (_) {
+                          return Container(
+                            width: 180,
+                            height: 100,
+                            color: Colors.grey.shade300,
+                            child: const Icon(
+                              Icons.broken_image,
+                              color: Colors.grey,
+                            ),
+                          );
+                        }
+                      },
+                    )
+                  : Text(
+                      text,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: isMe ? Colors.white : Colors.black87,
+                      ),
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
+              child: Text(
+                timeStr,
+                style: GoogleFonts.poppins(fontSize: 9, color: Colors.grey),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _messageController.clear();
+
+    try {
+      final userDoc = await widget.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final userData = userDoc.data() ?? {};
+      final userName = userData['fullName'] ?? userData['name'] ?? 'Customer';
+
+      await widget.firestore
+          .collection('bookings')
+          .doc(widget.bookingId)
+          .collection('messages')
+          .add({
+            'type': 'text',
+            'text': text,
+            'senderId': user.uid,
+            'senderName': userName,
+            'senderRole': 'customer',
+            'createdAt': FieldValue.serverTimestamp(),
+            'isReadByAdmin': false,
+          });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send message: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
