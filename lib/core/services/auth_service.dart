@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart' show Firebase, FirebaseApp;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:car_sync/core/services/user_service.dart';
 import 'package:car_sync/core/services/admin_service.dart';
@@ -140,16 +142,26 @@ class AuthService {
 
       User? user = result.user;
 
-      // Check if email is verified
       if (user != null) {
-        // Reload to get latest emailVerified status
         await user.reload();
         user = _auth.currentUser;
+
+        print("Auth emailVerified for $email: ${user?.emailVerified}");
 
         if (user != null && !user.emailVerified) {
           print("Email not verified: $email");
           await _auth.signOut();
           throw Exception('email-not-verified');
+        }
+
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+                'emailVerified': true,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
         }
       }
 
@@ -163,7 +175,7 @@ class AuthService {
       return null;
     } on FirebaseAuthException catch (e) {
       print("FirebaseAuthException: ${e.code}");
-      throw e; // Re-throw to be handled by UI
+      throw e;
     } catch (e) {
       print("Unexpected error: $e");
       throw e;
@@ -527,6 +539,64 @@ class AuthService {
     } catch (e) {
       print("Error updating foreman sites: $e");
       throw e;
+    }
+  }
+
+  Future<User?> technicianSignUpByAdmin({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phone,
+    required DateTime dateOfBirth,
+    required String workshopId,
+  }) async {
+    FirebaseApp? secondaryApp;
+
+    try {
+      secondaryApp = await Firebase.initializeApp(
+        name: 'technicianCreatorApp',
+        options: Firebase.app().options,
+      );
+    } on FirebaseException catch (e) {
+      if (e.code == 'duplicate-app') {
+        secondaryApp = Firebase.app('technicianCreatorApp');
+      } else {
+        rethrow;
+      }
+    }
+
+    final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp!);
+
+    try {
+      final credential = await secondaryAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = credential.user;
+
+      if (user != null) {
+        await user.sendEmailVerification();
+
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'fullName': fullName,
+          'email': email,
+          'phone': phone,
+          'dateOfBirth': Timestamp.fromDate(dateOfBirth),
+          'role': 'technician',
+          'workshopId': workshopId,
+          'emailVerified': false,
+          'profileImageUrl': '',
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await secondaryAuth.signOut();
+      return user;
+    } catch (e) {
+      rethrow;
     }
   }
 
