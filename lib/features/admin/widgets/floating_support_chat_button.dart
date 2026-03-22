@@ -1,6 +1,6 @@
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/support_chat_service.dart';
-import 'package:car_sync/features/admin/presentation/widgets/support_chat_sheet.dart';
+import 'package:car_sync/features/admin/widgets/support_chat_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 

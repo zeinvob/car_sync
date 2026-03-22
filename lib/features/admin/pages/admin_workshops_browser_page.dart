@@ -1,7 +1,7 @@
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/location_service.dart';
 import 'package:car_sync/core/services/workshop_service.dart';
-import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
+import 'package:car_sync/features/admin/pages/workshop_bookings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';

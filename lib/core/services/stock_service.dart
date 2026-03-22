@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:car_sync/features/admin/presentation/model/stock_item_model.dart';
+import 'package:car_sync/features/admin/model/stock_item_model.dart';
 
 class StockService {
   StockService._();

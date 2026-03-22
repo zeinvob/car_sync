@@ -1,5 +1,5 @@
 import 'package:car_sync/core/services/notification_service.dart';
-import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
+import 'package:car_sync/features/admin/pages/workshop_bookings_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
