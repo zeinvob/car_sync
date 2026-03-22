@@ -81,20 +81,12 @@ class NotificationService {
         debugPrint('Unsubscribed from admin topic');
       }
 
-      await saveUserDeviceToken(
-        uid: user.uid,
-        role: role,
-        token: token,
-      );
+      await saveUserDeviceToken(uid: user.uid, role: role, token: token);
 
       debugPrint('FCM token saved for user: ${user.uid}');
 
       _messaging.onTokenRefresh.listen((newToken) async {
-        await saveUserDeviceToken(
-          uid: user.uid,
-          role: role,
-          token: newToken,
-        );
+        await saveUserDeviceToken(uid: user.uid, role: role, token: newToken);
       });
     } catch (e) {
       debugPrint('Error saving FCM token: $e');
@@ -510,7 +502,9 @@ class NotificationService {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      debugPrint('Deleted ${snapshot.docs.length} notifications for user: $userId');
+      debugPrint(
+        'Deleted ${snapshot.docs.length} notifications for user: $userId',
+      );
     } catch (e) {
       debugPrint('Error deleting user notifications: $e');
     }
@@ -539,6 +533,27 @@ class NotificationService {
     } catch (e) {
       debugPrint('Error deleting read notifications: $e');
     }
+  }
+
+  Future<void> createPartOrderNotificationForAdmins({
+    required String orderId,
+    required String customerName,
+    required String partName,
+    required int quantity,
+  }) async {
+    await createNotification(
+      targetRole: 'admin',
+      type: 'part_order',
+      title: 'New Parts Order',
+      body: '$customerName ordered $quantity x $partName',
+      relatedBookingId: orderId,
+      extraData: {
+        'orderId': orderId,
+        'customerName': customerName,
+        'partName': partName,
+        'quantity': quantity,
+      },
+    );
   }
 }
 

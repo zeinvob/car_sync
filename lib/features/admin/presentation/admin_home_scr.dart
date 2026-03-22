@@ -17,6 +17,9 @@ import 'package:car_sync/features/admin/presentation/pages/notifications_page.da
 import 'package:car_sync/features/admin/presentation/pages/stock_page.dart';
 import 'package:car_sync/features/admin/presentation/pages/workshop_bookings_page.dart';
 import 'package:car_sync/features/admin/presentation/widgets/floating_support_chat_button.dart';
+import 'package:car_sync/features/admin/presentation/pages/technicians_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/parts_orders_page.dart';
+import 'package:car_sync/features/admin/presentation/pages/ratings_page.dart';
 import 'package:car_sync/features/auth/pages/login_form_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -295,9 +298,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     final pages = [
       _buildHomePage(),
       const AdminWorkshopsBrowserPage(),
-      const _SimplePage(title: "Services Page"),
+      const TechniciansPage(),
       const StockPage(),
-      const _SimplePage(title: "Parts Order Page"),
+      const PartsOrdersPage(),
     ];
 
     return PopScope(
@@ -751,6 +754,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                       );
 
                       await _refreshHomeData();
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _buildModernDrawerTile(
+                    icon: Icons.star_outline_rounded,
+                    title: 'Ratings & Feedback',
+                    onTap: () async {
+                      Navigator.pop(context);
+
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const RatingsPage()),
+                      );
                     },
                   ),
 
@@ -1331,25 +1349,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(child: _buildBookingsActionCard()),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildActionCard(
-                  icon: Icons.build_outlined,
-                  label: 'Services',
-                  color: Colors.orange,
-                  onTap: () {
-                    setState(() => _selectedIndex = 2);
-                  },
-                ),
-              ),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: _buildRatingsWideActionCard(),
           ),
           const SizedBox(height: 12),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Expanded(child: _buildBookingsActionCard()),
+              const SizedBox(width: 12),
               Expanded(
                 child: _buildActionCard(
                   icon: Icons.inventory_2_outlined,
@@ -1374,6 +1383,83 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRatingsWideActionCard() {
+    final cardColor = Theme.of(context).cardColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RatingsPage()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: onSurface.withOpacity(0.06)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.amber.withOpacity(0.20),
+                    Colors.orange.withOpacity(0.10),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.star_outline_rounded,
+                color: Colors.orange,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ratings and Feedback',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Latest customer reviews',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.5,
+                      color: onSurface.withOpacity(0.60),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildRatingsTicker(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1470,6 +1556,145 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRatingsQuickActionCard() {
+    final cardColor = Theme.of(context).cardColor;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RatingsPage()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: onSurface.withOpacity(0.06)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.amber.withOpacity(0.20),
+                    Colors.orange.withOpacity(0.10),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.star_outline_rounded,
+                color: Colors.orange,
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Ratings',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Latest customer feedback',
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: onSurface.withOpacity(0.60),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _buildRatingsTicker(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRatingsTicker() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('reviews')
+          .orderBy('createdAt', descending: true)
+          .limit(5)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final onSurface = Theme.of(context).colorScheme.onSurface;
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            height: 52,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Loading feedback...',
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: onSurface.withOpacity(0.55),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Container(
+            height: 52,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Unable to load feedback',
+              style: GoogleFonts.poppins(fontSize: 11, color: Colors.red),
+            ),
+          );
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        if (docs.isEmpty) {
+          return Container(
+            height: 52,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'No customer feedback yet',
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: onSurface.withOpacity(0.55),
+              ),
+            ),
+          );
+        }
+
+        final reviews = docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return {
+            'userName': (data['userName'] ?? 'Customer').toString(),
+            'comment': (data['comment'] ?? '').toString(),
+            'rating': _toDouble(data['rating']),
+          };
+        }).toList();
+
+        return SizedBox(
+          height: 52,
+          child: _AutoSlidingReviewTicker(reviews: reviews),
+        );
+      },
     );
   }
 
@@ -2079,9 +2304,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         'label': 'Bookings',
       },
       {
-        'icon': Icons.build_outlined,
-        'activeIcon': Icons.build,
-        'label': 'Services',
+        'icon': Icons.engineering_outlined,
+        'activeIcon': Icons.engineering,
+        'label': 'Foremen',
       },
       {
         'icon': Icons.inventory_2_outlined,
@@ -2219,6 +2444,117 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     } finally {
       if (mounted) setState(() => _isSigningOut = false);
     }
+  }
+}
+
+class _AutoSlidingReviewTicker extends StatefulWidget {
+  final List<Map<String, dynamic>> reviews;
+
+  const _AutoSlidingReviewTicker({required this.reviews});
+
+  @override
+  State<_AutoSlidingReviewTicker> createState() =>
+      _AutoSlidingReviewTickerState();
+}
+
+class _AutoSlidingReviewTickerState extends State<_AutoSlidingReviewTicker> {
+  late final PageController _pageController;
+  Timer? _timer;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(viewportFraction: 1);
+
+    if (widget.reviews.length > 1) {
+      _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+        if (!mounted || !_pageController.hasClients) return;
+
+        _currentIndex++;
+        if (_currentIndex >= widget.reviews.length) {
+          _currentIndex = 0;
+        }
+
+        _pageController.animateToPage(
+          _currentIndex,
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeInOut,
+        );
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return PageView.builder(
+      controller: _pageController,
+      scrollDirection: Axis.vertical,
+      itemCount: widget.reviews.length,
+      itemBuilder: (context, index) {
+        final review = widget.reviews[index];
+        final userName = review['userName'].toString();
+        final comment = review['comment'].toString();
+        final rating = (review['rating'] as num).toDouble();
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.format_quote_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '$userName • ${rating.toStringAsFixed(1)}★',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      comment.isEmpty ? 'No written feedback' : comment,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10.5,
+                        height: 1.35,
+                        color: onSurface.withOpacity(0.65),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 

@@ -336,7 +336,12 @@ class WorkshopService {
         .where('senderRole', isEqualTo: 'customer')
         .where('isReadByAdmin', isEqualTo: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .map((snapshot) {
+          return snapshot.docs.where((doc) {
+            final bookingDoc = doc.reference.parent.parent;
+            return bookingDoc?.parent.id == 'bookings';
+          }).length;
+        });
   }
 
   Future<List<Map<String, dynamic>>> getAllActiveBookingsForChat() async {
@@ -483,5 +488,5 @@ class WorkshopService {
     await _firestore.collection('workshops').doc(workshopId).delete();
   }
 
-    // workshops CRUD ----------------------------------------------------///////////////////////
+  // workshops CRUD ----------------------------------------------------///////////////////////
 }
