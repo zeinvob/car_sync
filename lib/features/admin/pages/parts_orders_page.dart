@@ -1,5 +1,5 @@
 import 'package:car_sync/core/constants/app_colors.dart';
-import 'package:car_sync/features/admin/presentation/pages/part_order_details_page.dart';
+import 'package:car_sync/features/admin/pages/part_order_details_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';

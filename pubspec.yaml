@@ -58,10 +58,18 @@ dependencies:
   map_launcher: ^3.5.0
   google_maps_flutter: ^2.13.1
   geocoding: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo/app_icon.png"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/logo/app_icon.png"
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
