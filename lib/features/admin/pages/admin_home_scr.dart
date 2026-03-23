@@ -42,10 +42,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   final WorkshopService _workshopService = WorkshopService();
   final AuthService _authService = AuthService();
 
+  int _activePartOrdersCount = 0;
   int _activeBookingsCount = 0;
   int _unreadNotificationCount = 0;
   int _unreadChatCount = 0;
 
+  StreamSubscription<QuerySnapshot>? _partOrdersSubscription;
   StreamSubscription<int>? _activeBookingsSubscription;
   StreamSubscription<int>? _notificationCountSubscription;
   StreamSubscription<int>? _chatCountSubscription;
@@ -70,6 +72,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    _listenToActivePartOrdersCount();
     _listenToNotificationCounts();
     _listenToActiveBookingsCount();
     _listenToUnreadChatCount();
@@ -87,6 +90,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
 
   @override
   void dispose() {
+    _partOrdersSubscription?.cancel();
     _notificationCountSubscription?.cancel();
     _activeBookingsSubscription?.cancel();
     _chatCountSubscription?.cancel();
@@ -98,10 +102,36 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _listenToActivePartOrdersCount();
       _listenToNotificationCounts();
       _listenToActiveBookingsCount();
       _listenToUnreadChatCount();
     }
+  }
+
+  void _listenToActivePartOrdersCount() {
+    _partOrdersSubscription?.cancel();
+
+    _partOrdersSubscription = FirebaseFirestore.instance
+        .collection('part_orders')
+        .snapshots()
+        .listen((snapshot) {
+          final count = snapshot.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = (data['status'] ?? '').toString().toLowerCase();
+
+            return status == 'pending' ||
+                status == 'processing' ||
+                status == 'shipped' ||
+                status == 'confirmed';
+          }).length;
+
+          if (mounted) {
+            setState(() {
+              _activePartOrdersCount = count;
+            });
+          }
+        });
   }
 
   void _listenToActiveBookingsCount() {
@@ -2367,6 +2397,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                           color: isSelected ? AppColors.primary : Colors.white,
                           size: 22,
                         ),
+
                         if (index == 1 && _activeBookingsCount > 0)
                           Positioned(
                             right: -8,
@@ -2388,6 +2419,37 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                                 _activeBookingsCount > 99
                                     ? '99+'
                                     : '$_activeBookingsCount',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        if (index == 4 && _activePartOrdersCount > 0)
+                          Positioned(
+                            right: -8,
+                            top: -6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                _activePartOrdersCount > 99
+                                    ? '99+'
+                                    : '$_activePartOrdersCount',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,

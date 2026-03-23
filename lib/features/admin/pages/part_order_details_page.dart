@@ -42,8 +42,14 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
     switch (status.toLowerCase()) {
       case 'pending':
         return Colors.orange;
+      case 'processing':
+        return Colors.indigo;
+      case 'shipped':
+        return Colors.purple;
       case 'confirmed':
         return Colors.green;
+      case 'completed':
+        return Colors.teal;
       case 'cancelled':
         return Colors.red;
       default:
@@ -115,10 +121,9 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Order confirmed and invoice created.',
+            'Order moved to processing.',
             style: GoogleFonts.poppins(),
           ),
-          behavior: SnackBarBehavior.floating,
         ),
       );
       Navigator.pop(context, true);
@@ -126,12 +131,72 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          content: Text('Failed: $e', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _markShipped() async {
+    setState(() => _isProcessing = true);
+
+    try {
+      await PartOrderService.instance.markOrderShipped(
+        orderId: widget.orderId,
+        orderData: widget.orderData,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
           content: Text(
-            'Failed: $e',
+            'Order marked as shipped.',
             style: GoogleFonts.poppins(),
           ),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed: $e', style: GoogleFonts.poppins()),
           backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _markDelivered() async {
+    setState(() => _isProcessing = true);
+
+    try {
+      await PartOrderService.instance.markOrderDelivered(
+        orderId: widget.orderId,
+        orderData: widget.orderData,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Order marked as delivered.',
+            style: GoogleFonts.poppins(),
+          ),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed: $e', style: GoogleFonts.poppins()),
+          backgroundColor: Colors.red,
         ),
       );
     } finally {
@@ -155,7 +220,6 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
             'Order cancelled.',
             style: GoogleFonts.poppins(),
           ),
-          behavior: SnackBarBehavior.floating,
         ),
       );
       Navigator.pop(context, true);
@@ -163,12 +227,8 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Failed: $e',
-            style: GoogleFonts.poppins(),
-          ),
+          content: Text('Failed: $e', style: GoogleFonts.poppins()),
           backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
@@ -179,9 +239,18 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
   @override
   Widget build(BuildContext context) {
     final data = widget.orderData;
+    final items = (data['items'] as List<dynamic>? ?? []);
+    final firstItem = items.isNotEmpty
+        ? Map<String, dynamic>.from(items.first as Map<String, dynamic>)
+        : <String, dynamic>{};
+    final shipping = (data['shippingAddress'] as Map<String, dynamic>? ?? {});
+
     final status = (data['status'] ?? 'pending').toString();
     final statusColor = _statusColor(status);
     final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    final imageUrl = (firstItem['imageUrl'] ?? '').toString();
+    final partName = (firstItem['partName'] ?? 'Part').toString();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -214,7 +283,7 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(18),
                   child: Image.network(
-                    (data['imageUrl'] ?? '').toString(),
+                    imageUrl,
                     width: 74,
                     height: 74,
                     fit: BoxFit.cover,
@@ -235,7 +304,7 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        (data['partName'] ?? 'Part').toString(),
+                        partName,
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -276,6 +345,7 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
             ),
           ),
           const SizedBox(height: 16),
+
           _sectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,35 +358,42 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                _infoRow('Part Name', (data['partName'] ?? '').toString()),
-                _infoRow('Type', (data['type'] ?? '').toString()),
-                _infoRow('Car Model', (data['carModel'] ?? '').toString()),
-                _infoRow('Quantity', '${_toInt(data['quantity'])}'),
-                _infoRow(
-                  'Unit Price',
-                  'RM ${_toDouble(data['unitPrice']).toStringAsFixed(2)}',
-                ),
-                _infoRow(
-                  'Sale Price',
-                  'RM ${_toDouble(data['salePrice']).toStringAsFixed(2)}',
-                ),
-                _infoRow(
-                  'Original Price',
-                  'RM ${_toDouble(data['originalPrice']).toStringAsFixed(2)}',
-                ),
-                _infoRow(
-                  'Total Price',
-                  'RM ${_toDouble(data['totalPrice']).toStringAsFixed(2)}',
-                ),
+                _infoRow('Order ID', widget.orderId),
+                _infoRow('Invoice No', (data['invoiceNumber'] ?? '-').toString()),
                 _infoRow('Status', status),
+                _infoRow(
+                  'Items Count',
+                  '${_toInt(data['itemCount'] ?? items.length)}',
+                ),
+                _infoRow(
+                  'Subtotal',
+                  'RM ${_toDouble(data['subtotal']).toStringAsFixed(2)}',
+                ),
+                _infoRow(
+                  'Shipping Fee',
+                  'RM ${_toDouble(data['shippingFee']).toStringAsFixed(2)}',
+                ),
+                _infoRow(
+                  'Total Amount',
+                  'RM ${_toDouble(data['totalAmount']).toStringAsFixed(2)}',
+                ),
                 _infoRow(
                   'Created At',
                   _formatDate(data['createdAt'] as Timestamp?),
+                ),
+                _infoRow(
+                  'Updated At',
+                  _formatDate(data['updatedAt'] as Timestamp?),
+                ),
+                _infoRow(
+                  'Completed At',
+                  _formatDate(data['completedAt'] as Timestamp?),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 14),
+
           _sectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,7 +413,95 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
               ],
             ),
           ),
+          const SizedBox(height: 14),
+
+          _sectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Shipping Address',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _infoRow(
+                  'Address',
+                  (shipping['address'] ??
+                          shipping['addressLine1'] ??
+                          '')
+                      .toString(),
+                ),
+                _infoRow('City', (shipping['city'] ?? '').toString()),
+                _infoRow('State', (shipping['state'] ?? '').toString()),
+                _infoRow('Postcode', (shipping['postcode'] ?? '').toString()),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          _sectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ordered Items',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...items.map((rawItem) {
+                  final item = Map<String, dynamic>.from(
+                    rawItem as Map<String, dynamic>,
+                  );
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (item['partName'] ?? 'Part').toString(),
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _infoRow('Part ID', (item['partId'] ?? '').toString()),
+                        _infoRow('Type', (item['type'] ?? '').toString()),
+                        _infoRow('Car Model', (item['carModel'] ?? '').toString()),
+                        _infoRow('Quantity', '${_toInt(item['quantity'])}'),
+                        _infoRow(
+                          'Unit Price',
+                          'RM ${_toDouble(item['unitPrice']).toStringAsFixed(2)}',
+                        ),
+                        _infoRow(
+                          'Sale Price',
+                          'RM ${_toDouble(item['salePrice']).toStringAsFixed(2)}',
+                        ),
+                        _infoRow(
+                          'Original Price',
+                          'RM ${_toDouble(item['originalPrice']).toStringAsFixed(2)}',
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+
           const SizedBox(height: 18),
+
           if (status.toLowerCase() == 'pending') ...[
             SizedBox(
               height: 52,
@@ -349,9 +514,7 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
                   ),
                 ),
                 child: Text(
-                  _isProcessing
-                      ? 'Processing...'
-                      : 'Confirm & Create Invoice',
+                  _isProcessing ? 'Processing...' : 'Confirm Order',
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -360,6 +523,57 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
               ),
             ),
             const SizedBox(height: 12),
+          ],
+
+          if (status.toLowerCase() == 'processing') ...[
+            SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _isProcessing ? null : _markShipped,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Text(
+                  _isProcessing ? 'Processing...' : 'Mark as Shipped',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          if (status.toLowerCase() == 'shipped') ...[
+            SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _isProcessing ? null : _markDelivered,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Text(
+                  _isProcessing ? 'Processing...' : 'Mark as Delivered',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          if (status.toLowerCase() == 'pending' ||
+              status.toLowerCase() == 'processing' ||
+              status.toLowerCase() == 'shipped') ...[
             SizedBox(
               height: 52,
               child: OutlinedButton(
