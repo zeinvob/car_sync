@@ -39,17 +39,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         );
       case 'confirmed':
         return (
-          Colors.blue,
-          'Confirmed',
-          Icons.check_circle,
-          'Your order has been confirmed and is being prepared',
+          Colors.green,
+          'Delivered',
+          Icons.local_shipping,
+          'Your order has been delivered. Please confirm receipt.',
         );
       case 'processing':
         return (
           Colors.indigo,
           'Processing',
           Icons.precision_manufacturing,
-          'Your order is being prepared for shipping',
+          'Your order is being prepared',
         );
       case 'shipped':
         return (
@@ -70,7 +70,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Colors.teal,
           'Completed',
           Icons.task_alt,
-          'Order completed successfully',
+          'Order completed. Thank you for your purchase!',
         );
       case 'cancelled':
         return (
@@ -114,14 +114,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     switch (status) {
       case 'pending':
         return 0;
-      case 'confirmed':
       case 'processing':
         return 1;
+      case 'confirmed':
       case 'shipped':
-        return 2;
       case 'delivered':
       case 'completed':
-        return 3;
+        return 2;
       case 'cancelled':
         return -1;
       default:
@@ -195,18 +194,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 _buildProgressStep(
                   1,
                   currentStep,
-                  'Confirmed',
-                  Icons.check_circle,
+                  'Processing',
+                  Icons.precision_manufacturing,
                 ),
                 _buildProgressLine(currentStep >= 2),
                 _buildProgressStep(
                   2,
                   currentStep,
-                  'Shipped',
-                  Icons.local_shipping,
+                  'Delivered',
+                  Icons.check_circle,
                 ),
-                _buildProgressLine(currentStep >= 3),
-                _buildProgressStep(3, currentStep, 'Received', Icons.home),
               ],
             ),
           ],
