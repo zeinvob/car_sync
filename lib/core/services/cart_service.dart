@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:car_sync/core/models/cart_item.dart';
+import 'package:car_sync/features/customer/model/cart_item_model.dart';
 
 /// Service for managing shopping cart state
 class CartService extends ChangeNotifier {

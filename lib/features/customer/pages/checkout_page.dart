@@ -1,5 +1,5 @@
 import 'package:car_sync/core/constants/app_colors.dart';
-import 'package:car_sync/core/models/cart_item.dart';
+import 'package:car_sync/features/customer/model/cart_item_model.dart';
 import 'package:car_sync/core/services/cart_service.dart';
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/core/services/user_service.dart';

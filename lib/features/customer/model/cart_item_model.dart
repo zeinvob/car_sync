@@ -26,8 +26,10 @@ class CartItem {
     required this.stock,
   });
 
+  /// Calculate total price for this item
   double get totalPrice => unitPrice * quantity;
 
+  /// Convert to map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'partId': partId,
@@ -41,9 +43,11 @@ class CartItem {
       'onSale': onSale,
       'quantity': quantity,
       'stock': stock,
+      'totalPrice': totalPrice,
     };
   }
 
+  /// Create from map
   factory CartItem.fromMap(Map<String, dynamic> map) {
     return CartItem(
       partId: map['partId'] ?? '',
@@ -60,6 +64,7 @@ class CartItem {
     );
   }
 
+  /// Create from spare part data
   factory CartItem.fromPart(Map<String, dynamic> part, {int quantity = 1}) {
     final originalPrice = (part['originalPrice'] ?? part['price'] ?? 0).toDouble();
     final salePrice = part['salePrice'] != null ? (part['salePrice']).toDouble() : null;
@@ -81,6 +86,7 @@ class CartItem {
     );
   }
 
+  /// Create a copy with updated values
   CartItem copyWith({
     String? partId,
     String? partName,
