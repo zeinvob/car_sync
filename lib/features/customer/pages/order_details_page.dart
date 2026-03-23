@@ -28,6 +28,67 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     _orderData = Map<String, dynamic>.from(widget.orderData);
   }
 
+  (Color, String, IconData, String) _getStatusDetails(String status) {
+    switch (status) {
+      case 'pending':
+        return (
+          Colors.orange,
+          'Pending',
+          Icons.hourglass_empty,
+          'Your order is waiting to be processed',
+        );
+      case 'confirmed':
+        return (
+          Colors.blue,
+          'Confirmed',
+          Icons.check_circle,
+          'Your order has been confirmed and is being prepared',
+        );
+      case 'processing':
+        return (
+          Colors.indigo,
+          'Processing',
+          Icons.precision_manufacturing,
+          'Your order is being prepared for shipping',
+        );
+      case 'shipped':
+        return (
+          Colors.purple,
+          'Shipped',
+          Icons.local_shipping,
+          'Your order is on the way',
+        );
+      case 'delivered':
+        return (
+          Colors.green,
+          'Delivered',
+          Icons.inventory,
+          'Your order has been delivered',
+        );
+      case 'completed':
+        return (
+          Colors.teal,
+          'Completed',
+          Icons.task_alt,
+          'Order completed successfully',
+        );
+      case 'cancelled':
+        return (
+          Colors.red,
+          'Cancelled',
+          Icons.cancel,
+          'This order has been cancelled',
+        );
+      default:
+        return (
+          Colors.grey,
+          status.toUpperCase(),
+          Icons.info,
+          'Order status unknown',
+        );
+    }
+  }
+
   (Color, String) _getStatusStyle(String status) {
     switch (status) {
       case 'pending':
@@ -47,6 +108,175 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       default:
         return (Colors.grey, status.toUpperCase());
     }
+  }
+
+  int _getStatusStep(String status) {
+    switch (status) {
+      case 'pending':
+        return 0;
+      case 'confirmed':
+      case 'processing':
+        return 1;
+      case 'shipped':
+        return 2;
+      case 'delivered':
+      case 'completed':
+        return 3;
+      case 'cancelled':
+        return -1;
+      default:
+        return 0;
+    }
+  }
+
+  Widget _buildOrderStatusSection(String status) {
+    final (statusColor, statusLabel, statusIcon, statusDescription) =
+        _getStatusDetails(status);
+    final currentStep = _getStatusStep(status);
+    final isCancelled = status == 'cancelled';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: statusColor.withOpacity(0.3), width: 1.5),
+      ),
+      child: Column(
+        children: [
+          // Status Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(statusIcon, color: statusColor, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      statusLabel,
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: statusColor,
+                      ),
+                    ),
+                    Text(
+                      statusDescription,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          // Progress Tracker (not for cancelled orders)
+          if (!isCancelled) ...[
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                _buildProgressStep(
+                  0,
+                  currentStep,
+                  'Placed',
+                  Icons.receipt_long,
+                ),
+                _buildProgressLine(currentStep >= 1),
+                _buildProgressStep(
+                  1,
+                  currentStep,
+                  'Confirmed',
+                  Icons.check_circle,
+                ),
+                _buildProgressLine(currentStep >= 2),
+                _buildProgressStep(
+                  2,
+                  currentStep,
+                  'Shipped',
+                  Icons.local_shipping,
+                ),
+                _buildProgressLine(currentStep >= 3),
+                _buildProgressStep(3, currentStep, 'Received', Icons.home),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressStep(
+    int step,
+    int currentStep,
+    String label,
+    IconData icon,
+  ) {
+    final isCompleted = currentStep >= step;
+    final isActive = currentStep == step;
+
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isCompleted ? AppColors.primary : Colors.grey[300],
+              shape: BoxShape.circle,
+              border: isActive
+                  ? Border.all(color: AppColors.primary, width: 3)
+                  : null,
+              boxShadow: isActive
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: isCompleted ? Colors.white : Colors.grey[500],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              fontWeight: isCompleted ? FontWeight.w600 : FontWeight.w400,
+              color: isCompleted ? AppColors.primary : Colors.grey[500],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressLine(bool isCompleted) {
+    return Container(
+      width: 20,
+      height: 3,
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: isCompleted ? AppColors.primary : Colors.grey[300],
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
   }
 
   Future<void> _confirmReceived() async {
@@ -752,6 +982,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
+                // Order Status Section - Prominent display
+                _buildOrderStatusSection(status),
+                const SizedBox(height: 20),
+
                 // Confirm Received Button for Delivered Orders
                 if (canConfirmReceived) ...[
                   Container(
