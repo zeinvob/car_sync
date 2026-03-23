@@ -31,6 +31,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   bool _isLoading = true;
   bool _isProcessing = false;
+  bool _saveAsDefault = false;
+  bool _hasDefaultAddress = false;
 
   @override
   void initState() {
@@ -62,10 +64,32 @@ class _CheckoutPageState extends State<CheckoutPage> {
           _nameController.text = userData['fullName'] ?? userData['name'] ?? '';
           _emailController.text = userData['email'] ?? user.email ?? '';
           _phoneController.text = userData['phone'] ?? '';
-          _addressController.text = userData['address'] ?? '';
-          _cityController.text = userData['city'] ?? '';
-          _postcodeController.text = userData['postcode'] ?? '';
-          _stateController.text = userData['state'] ?? '';
+
+          // Check for default shipping address
+          final defaultAddress =
+              userData['defaultShippingAddress'] as Map<String, dynamic>?;
+          if (defaultAddress != null) {
+            _hasDefaultAddress = true;
+            _addressController.text = defaultAddress['address'] ?? '';
+            _cityController.text = defaultAddress['city'] ?? '';
+            _postcodeController.text = defaultAddress['postcode'] ?? '';
+            _stateController.text = defaultAddress['state'] ?? '';
+            // Also load name and phone from default address if available
+            if (defaultAddress['fullName'] != null &&
+                defaultAddress['fullName'].toString().isNotEmpty) {
+              _nameController.text = defaultAddress['fullName'];
+            }
+            if (defaultAddress['phone'] != null &&
+                defaultAddress['phone'].toString().isNotEmpty) {
+              _phoneController.text = defaultAddress['phone'];
+            }
+          } else {
+            // Fallback to basic user data if no default address
+            _addressController.text = userData['address'] ?? '';
+            _cityController.text = userData['city'] ?? '';
+            _postcodeController.text = userData['postcode'] ?? '';
+            _stateController.text = userData['state'] ?? '';
+          }
         } else {
           _emailController.text = user.email ?? '';
           _nameController.text = user.displayName ?? '';
@@ -200,14 +224,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       width: 50,
                       height: 50,
                       color: Colors.grey.shade200,
-                      child: Icon(Icons.image, color: Colors.grey.shade400, size: 20),
+                      child: Icon(
+                        Icons.image,
+                        color: Colors.grey.shade400,
+                        size: 20,
+                      ),
                     ),
                   )
                 : Container(
                     width: 50,
                     height: 50,
                     color: Colors.grey.shade200,
-                    child: Icon(Icons.image, color: Colors.grey.shade400, size: 20),
+                    child: Icon(
+                      Icons.image,
+                      color: Colors.grey.shade400,
+                      size: 20,
+                    ),
                   ),
           ),
           const SizedBox(width: 12),
@@ -328,6 +360,70 @@ class _CheckoutPageState extends State<CheckoutPage> {
             icon: Icons.map_outlined,
             validator: (v) => v?.isEmpty == true ? 'State is required' : null,
           ),
+          const SizedBox(height: 16),
+          // Save as default address option
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: _saveAsDefault,
+                    onChanged: (value) {
+                      setState(() => _saveAsDefault = value ?? false);
+                    },
+                    activeColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => _saveAsDefault = !_saveAsDefault);
+                    },
+                    child: Text(
+                      _hasDefaultAddress
+                          ? 'Update as my default shipping address'
+                          : 'Save as my default shipping address',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_hasDefaultAddress) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    size: 16,
+                    color: Colors.green.shade600,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Using your saved default address',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.green.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -363,7 +459,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
       ),
     );
   }
@@ -403,11 +502,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 style: GoogleFonts.poppins(fontSize: 14, color: onSurface),
               ),
               Text(
-                shippingFee > 0 ? 'RM ${shippingFee.toStringAsFixed(2)}' : 'FREE',
+                shippingFee > 0
+                    ? 'RM ${shippingFee.toStringAsFixed(2)}'
+                    : 'FREE',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   color: shippingFee > 0 ? onSurface : Colors.green,
-                  fontWeight: shippingFee > 0 ? FontWeight.normal : FontWeight.w600,
+                  fontWeight: shippingFee > 0
+                      ? FontWeight.normal
+                      : FontWeight.w600,
                 ),
               ),
             ],
@@ -496,26 +599,47 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final refNumber = 'CS-${DateTime.now().millisecondsSinceEpoch}';
 
       // Create order in Firestore
-      final orderRef = await FirebaseFirestore.instance.collection('part_orders').add({
-        'customerId': user.uid,
-        'customerName': _nameController.text.trim(),
-        'customerEmail': _emailController.text.trim(),
-        'customerPhone': _phoneController.text.trim(),
-        'shippingAddress': {
-          'address': _addressController.text.trim(),
-          'city': _cityController.text.trim(),
-          'postcode': _postcodeController.text.trim(),
-          'state': _stateController.text.trim(),
-        },
-        'items': _cartService.toMapList(),
-        'itemCount': _cartService.itemCount,
-        'subtotal': _cartService.subtotal,
-        'shippingFee': 0.0,
-        'totalAmount': _cartService.subtotal,
-        'referenceNumber': refNumber,
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      final orderRef = await FirebaseFirestore.instance
+          .collection('part_orders')
+          .add({
+            'customerId': user.uid,
+            'customerName': _nameController.text.trim(),
+            'customerEmail': _emailController.text.trim(),
+            'customerPhone': _phoneController.text.trim(),
+            'shippingAddress': {
+              'fullName': _nameController.text.trim(),
+              'phone': _phoneController.text.trim(),
+              'addressLine1': _addressController.text.trim(),
+              'addressLine2': '',
+              'address': _addressController.text.trim(),
+              'city': _cityController.text.trim(),
+              'postcode': _postcodeController.text.trim(),
+              'state': _stateController.text.trim(),
+            },
+            'items': _cartService.toMapList(),
+            'itemCount': _cartService.itemCount,
+            'subtotal': _cartService.subtotal,
+            'shippingFee': 0.0,
+            'totalAmount': _cartService.subtotal,
+            'referenceNumber': refNumber,
+            'status': 'pending',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+      // Save as default address if checkbox is checked
+      if (_saveAsDefault) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'defaultShippingAddress': {
+            'fullName': _nameController.text.trim(),
+            'phone': _phoneController.text.trim(),
+            'address': _addressController.text.trim(),
+            'city': _cityController.text.trim(),
+            'postcode': _postcodeController.text.trim(),
+            'state': _stateController.text.trim(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        }, SetOptions(merge: true));
+      }
 
       // Create notification for admins
       await NotificationService.instance.createPartOrderNotificationForAdmins(
@@ -536,7 +660,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
           context: context,
           barrierDismissible: false,
           builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
             content: Stack(
               children: [
