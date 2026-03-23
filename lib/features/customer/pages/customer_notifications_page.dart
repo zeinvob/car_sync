@@ -1,5 +1,6 @@
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/features/customer/pages/booking_details_page.dart';
+import 'package:car_sync/features/customer/pages/my_orders_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -56,6 +57,12 @@ class _CustomerNotificationsPageState extends State<CustomerNotificationsPage> {
         return Icons.update;
       case 'repair_update':
         return Icons.build;
+      case 'invoice_created':
+        return Icons.receipt_long;
+      case 'part_order_cancelled':
+        return Icons.cancel_outlined;
+      case 'part_order_status':
+        return Icons.local_shipping_outlined;
       default:
         return Icons.notifications_outlined;
     }
@@ -406,11 +413,25 @@ class _NotificationItemState extends State<_NotificationItem> {
               userId: widget.userId,
             );
 
-            // Get the status from extraData
+            // Get the extraData
             final extraData = (widget.item['extraData'] is Map<String, dynamic>)
                 ? widget.item['extraData'] as Map<String, dynamic>
                 : <String, dynamic>{};
             final String? newStatus = extraData['newStatus']?.toString();
+            final String notificationType = widget.type;
+
+            // Handle invoice_created and part_order notifications
+            if (notificationType == 'invoice_created' || 
+                notificationType == 'part_order_cancelled' ||
+                notificationType == 'part_order_status') {
+              if (mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MyOrdersPage()),
+                );
+              }
+              return;
+            }
 
             // Navigate to booking details if available
             final relatedBookingId = (widget.item['relatedBookingId'] ?? '').toString();

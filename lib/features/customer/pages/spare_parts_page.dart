@@ -1,7 +1,10 @@
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/services/sparepart_service.dart';
+import 'package:car_sync/core/services/cart_service.dart';
+import 'package:car_sync/features/customer/pages/cart_page.dart';
+import 'package:car_sync/features/customer/pages/checkout_page.dart';
 import 'package:car_sync/features/customer/pages/customer_support_chat_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:car_sync/features/customer/pages/my_orders_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -116,6 +119,7 @@ class SparePartsListPage extends StatefulWidget {
 
 class _SparePartsListPageState extends State<SparePartsListPage> {
   final SparePartService _sparePartService = SparePartService();
+  final CartService _cartService = CartService.instance;
   final TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> _allParts = [];
@@ -125,13 +129,19 @@ class _SparePartsListPageState extends State<SparePartsListPage> {
   @override
   void initState() {
     super.initState();
+    _cartService.addListener(_onCartChanged);
     _loadSpareParts();
   }
 
   @override
   void dispose() {
+    _cartService.removeListener(_onCartChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadSpareParts() async {
@@ -190,6 +200,59 @@ class _SparePartsListPageState extends State<SparePartsListPage> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         foregroundColor: Theme.of(context).colorScheme.onSurface,
+        actions: [
+          // My Orders Icon
+          IconButton(
+            icon: const Icon(Icons.receipt_long_outlined),
+            tooltip: 'My Orders',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyOrdersPage()),
+              );
+            },
+          ),
+          // Cart Icon with Badge
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_cart_outlined),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CartPage()),
+                  );
+                },
+              ),
+              if (_cartService.itemCount > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEE4D2D),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      _cartService.itemCount > 99 ? '99+' : '${_cartService.itemCount}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -564,7 +627,9 @@ class _PartDetailsSheet extends StatefulWidget {
 
 class _PartDetailsSheetState extends State<_PartDetailsSheet> {
   final TextEditingController _quantityController = TextEditingController(text: '1');
+  final CartService _cartService = CartService.instance;
   bool _isBuying = false;
+  bool _isAddingToCart = false;
 
   @override
   void dispose() {
@@ -587,69 +652,27 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
     setState(() => _isBuying = true);
 
     try {
-      // Get user data
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      final userData = userDoc.data() ?? {};
-
-      // Calculate prices
-      final originalPrice =
-          (widget.part['originalPrice'] ?? widget.part['price'] ?? 0)
-              .toDouble();
-      final salePrice = widget.part['salePrice'] != null
-          ? (widget.part['salePrice']).toDouble()
-          : null;
-      final onSale = widget.part['onSale'] == true && salePrice != null;
-      final unitPrice = onSale ? salePrice! : originalPrice;
-      final totalPrice = unitPrice * quantity;
-
-      // Create order document
-      await FirebaseFirestore.instance.collection('part_orders').add({
-        'partId': widget.part['id'] ?? '',
-        'partName': widget.part['part'] ?? '',
-        'carModel': widget.part['car_model'] ?? '',
-        'imageUrl': widget.part['imageUrl'] ?? '',
-        'type': widget.part['type'] ?? '',
-        'quantity': quantity,
-        'unitPrice': unitPrice,
-        'originalPrice': originalPrice,
-        'salePrice': salePrice,
-        'totalPrice': totalPrice,
-        'onSale': onSale,
-        'customerId': user.uid,
-        'customerName': userData['fullName'] ?? userData['name'] ?? 'Customer',
-        'customerEmail': user.email ?? '',
-        'customerPhone': userData['phone'] ?? '',
-        'status': 'pending', // pending, confirmed, shipped, delivered, cancelled
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // Clear cart first for "Buy Now" flow
+      _cartService.clearCart();
+      
+      // Add this item to cart with specified quantity
+      _cartService.addFromPart(widget.part, quantity: quantity);
 
       if (mounted) {
-        Navigator.pop(context); // Close purchase dialog
-        Navigator.pop(context); // Close details sheet
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text('Order placed for $quantity x ${widget.part['part']}'),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
+        // Close the details sheet
+        Navigator.pop(context);
+        
+        // Navigate directly to checkout
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CheckoutPage()),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to place order: $e'),
+            content: Text('Failed to proceed: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1078,7 +1101,7 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
                   Text(
                     'RM ${displayPrice.toStringAsFixed(2)}',
                     style: GoogleFonts.poppins(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: const Color(0xFFEE4D2D),
                     ),
@@ -1086,22 +1109,31 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
                 ],
               ),
             ),
-            // Ask Info Button
+            // Add to Cart Button
             SizedBox(
               height: 44,
               child: OutlinedButton.icon(
-                onPressed: () => _showChatDialog(),
-                icon: const Icon(Icons.support_agent, size: 18),
+                onPressed: isInStock && !_isAddingToCart ? () => _addToCart() : null,
+                icon: _isAddingToCart
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFEE4D2D),
+                        ),
+                      )
+                    : const Icon(Icons.add_shopping_cart, size: 18),
                 label: Text(
-                  'Ask',
+                  'Cart',
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w500,
                     fontSize: 13,
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.teal,
-                  side: const BorderSide(color: Colors.teal, width: 1.5),
+                  foregroundColor: const Color(0xFFEE4D2D),
+                  side: const BorderSide(color: Color(0xFFEE4D2D), width: 1.5),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -1124,9 +1156,9 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.shopping_cart, size: 18),
+                    : const Icon(Icons.shopping_cart_checkout, size: 18),
                 label: Text(
-                  _isBuying ? 'Processing...' : 'Buy Now',
+                  _isBuying ? '...' : 'Buy Now',
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
@@ -1147,6 +1179,60 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
         ),
       ),
     );
+  }
+
+  void _addToCart() {
+    setState(() => _isAddingToCart = true);
+
+    try {
+      _cartService.addFromPart(widget.part, quantity: 1);
+
+      if (mounted) {
+        // Capture the navigator and scaffold messenger before any async operations
+        final navigator = Navigator.of(context);
+        final scaffoldMessenger = ScaffoldMessenger.of(context);
+        
+        // Close the bottom sheet first
+        navigator.pop();
+        
+        // Then show snackbar on the parent page
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('${widget.part['part']} added to cart'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'View Cart',
+              textColor: Colors.white,
+              onPressed: () {
+                navigator.push(
+                  MaterialPageRoute(builder: (_) => const CartPage()),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add to cart: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isAddingToCart = false);
+    }
   }
 
   Widget _buildDetailRow(

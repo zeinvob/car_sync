@@ -1753,13 +1753,6 @@ class _CustomerHomePageState extends State<CustomerHomePage>
             // Preferences Section
             _buildSectionLabel(loc?.translate('preferences') ?? 'Preferences'),
             _buildProfileOption(
-              icon: Icons.location_city_outlined,
-              title: loc?.translate('state') ?? 'State',
-              onTap: () {
-                _showStateSelectionDialog();
-              },
-            ),
-            _buildProfileOption(
               icon: Icons.language_outlined,
               title: loc?.translate('language') ?? 'Language',
               onTap: () {
@@ -1886,62 +1879,6 @@ class _CustomerHomePageState extends State<CustomerHomePage>
             color: Colors.grey[600],
           ),
         ),
-      ),
-    );
-  }
-
-  void _showStateSelectionDialog() {
-    final states = [
-      'Johor',
-      'Kedah',
-      'Kelantan',
-      'Kuala Lumpur',
-      'Labuan',
-      'Melaka',
-      'Negeri Sembilan',
-      'Pahang',
-      'Penang',
-      'Perak',
-      'Perlis',
-      'Putrajaya',
-      'Sabah',
-      'Sarawak',
-      'Selangor',
-      'Terengganu',
-    ];
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Select State',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: states.length,
-            itemBuilder: (context, index) {
-              return ListTile(
-                title: Text(states[index], style: GoogleFonts.poppins()),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('State set to ${states[index]}')),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.poppins()),
-          ),
-        ],
       ),
     );
   }
