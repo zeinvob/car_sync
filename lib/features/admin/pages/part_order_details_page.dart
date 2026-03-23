@@ -114,7 +114,7 @@ class _PartOrderDetailsPageState extends State<PartOrderDetailsPage> {
       await PartOrderService.instance.confirmOrderAndCreateInvoice(
         orderId: widget.orderId,
         orderData: widget.orderData,
-        reduceStock: false,
+        reduceStock: true,
       );
 
       if (!mounted) return;
