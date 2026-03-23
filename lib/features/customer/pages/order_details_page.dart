@@ -39,45 +39,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         );
       case 'confirmed':
         return (
-          Colors.green,
-          'Delivered',
-          Icons.local_shipping,
-          'Your order has been delivered. Please confirm receipt.',
-        );
-      case 'processing':
-        return (
-          Colors.indigo,
-          'Processing',
-          Icons.precision_manufacturing,
-          'Your order is being prepared',
-        );
-      case 'shipped':
-        return (
-          Colors.purple,
-          'Shipped',
-          Icons.local_shipping,
-          'Your order is on the way',
-        );
-      case 'delivered':
-        return (
-          Colors.green,
-          'Delivered',
-          Icons.inventory,
-          'Your order has been delivered',
+          Colors.blue,
+          'Confirmed',
+          Icons.check_circle,
+          'Your order has been confirmed',
         );
       case 'completed':
         return (
-          Colors.teal,
+          Colors.green,
           'Completed',
           Icons.task_alt,
           'Order completed. Thank you for your purchase!',
-        );
-      case 'cancelled':
-        return (
-          Colors.red,
-          'Cancelled',
-          Icons.cancel,
-          'This order has been cancelled',
         );
       default:
         return (
@@ -95,16 +67,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         return (Colors.orange, 'Pending');
       case 'confirmed':
         return (Colors.blue, 'Confirmed');
-      case 'processing':
-        return (Colors.indigo, 'Processing');
-      case 'shipped':
-        return (Colors.purple, 'Shipped');
-      case 'delivered':
-        return (Colors.green, 'Delivered');
       case 'completed':
-        return (Colors.teal, 'Completed');
-      case 'cancelled':
-        return (Colors.red, 'Cancelled');
+        return (Colors.green, 'Completed');
       default:
         return (Colors.grey, status.toUpperCase());
     }
@@ -114,15 +78,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     switch (status) {
       case 'pending':
         return 0;
-      case 'processing':
-        return 1;
       case 'confirmed':
-      case 'shipped':
-      case 'delivered':
+        return 1;
       case 'completed':
         return 2;
-      case 'cancelled':
-        return -1;
       default:
         return 0;
     }

@@ -153,10 +153,7 @@ class _MyOrdersPageState extends State<MyOrdersPage>
                   final status = (data['status'] ?? '')
                       .toString()
                       .toLowerCase();
-                  return status == 'pending' ||
-                      status == 'confirmed' ||
-                      status == 'processing' ||
-                      status == 'shipped';
+                  return status == 'pending' || status == 'confirmed';
                 }).toList();
 
                 debugPrint(
@@ -168,9 +165,7 @@ class _MyOrdersPageState extends State<MyOrdersPage>
                   final status = (data['status'] ?? '')
                       .toString()
                       .toLowerCase();
-                  return status == 'completed' ||
-                      status == 'delivered' ||
-                      status == 'cancelled';
+                  return status == 'completed';
                 }).toList();
 
                 return TabBarView(
@@ -426,16 +421,8 @@ class _MyOrdersPageState extends State<MyOrdersPage>
         return (Colors.orange, 'Pending');
       case 'confirmed':
         return (Colors.blue, 'Confirmed');
-      case 'processing':
-        return (Colors.indigo, 'Processing');
-      case 'shipped':
-        return (Colors.purple, 'Shipped');
-      case 'delivered':
-        return (Colors.green, 'Delivered');
       case 'completed':
-        return (Colors.teal, 'Completed');
-      case 'cancelled':
-        return (Colors.red, 'Cancelled');
+        return (Colors.green, 'Completed');
       default:
         return (Colors.grey, status.toUpperCase());
     }
