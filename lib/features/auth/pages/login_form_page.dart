@@ -1,3 +1,4 @@
+import 'package:car_sync/features/technician/pages/technician_main_layout.dart';
 import 'package:car_sync/features/auth/pages/signup_page.dart';
 import 'package:car_sync/features/customer/pages/home.dart';
 import 'package:car_sync/features/technician/pages/home.dart';
@@ -389,7 +390,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
           // Navigate to Technician/Foreman Home Screen
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const TechnicianHome()),
+            MaterialPageRoute(builder: (context) =>  TechnicianMainLayout()),
             (route) => false,
           );
         } else {

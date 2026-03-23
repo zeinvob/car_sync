@@ -9,6 +9,7 @@ import 'package:car_sync/features/splash/pages/video_splash_scr.dart';
 import 'package:car_sync/core/services/auth_service.dart';
 import 'package:car_sync/features/admin/pages/admin_home_scr.dart';
 import 'package:car_sync/features/technician/pages/home.dart';
+import 'package:car_sync/features/technician/pages/technician_main_layout.dart'; // <-- ADDED THIS IMPORT
 import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/theme/theme_controller.dart';
 import 'package:car_sync/core/services/auth_nav_flag.dart';
@@ -188,12 +189,12 @@ class RoleBasedHomeLoader extends StatelessWidget {
           );
         }
 
-        final role = snapshot.data;
+        final role = snapshot.data?.toLowerCase().trim();
 
         if (role == 'admin') {
           return const AdminThemeWrapper(child: AdminHomeScreen());
         } else if (role == 'technician' || role == 'foreman') {
-          return const TechnicianHome();
+          return const TechnicianMainLayout(); // <-- CHANGED THIS LINE ONLY
         } else {
           return const CustomerHomePage();
         }
