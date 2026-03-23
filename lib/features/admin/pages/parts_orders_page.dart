@@ -32,32 +32,108 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
   double _toDouble(dynamic value) {
     if (value is int) return value.toDouble();
     if (value is double) return value;
-    return double.tryParse('$value') ?? 0;
+    return double.tryParse('$value') ?? 0.0;
+  }
+
+  Map<String, dynamic> _firstItem(Map<String, dynamic> data) {
+    final items = data['items'] as List<dynamic>? ?? [];
+    if (items.isNotEmpty) {
+      return Map<String, dynamic>.from(items.first as Map<String, dynamic>);
+    }
+    return {};
+  }
+
+  String _partName(Map<String, dynamic> data) {
+    final item = _firstItem(data);
+    return (item['partName'] ?? data['partName'] ?? 'Part').toString();
+  }
+
+  String _imageUrl(Map<String, dynamic> data) {
+    final item = _firstItem(data);
+    return (item['imageUrl'] ?? data['imageUrl'] ?? '').toString();
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'processing':
+        return Colors.indigo;
+      case 'shipped':
+        return Colors.purple;
+      case 'confirmed':
+        return Colors.green;
+      case 'completed':
+        return Colors.teal;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _mapFilterToStatus(String filter) {
+    switch (filter.toLowerCase()) {
+      case 'delivered':
+        return 'confirmed';
+      default:
+        return filter.toLowerCase();
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'Pending';
+      case 'processing':
+        return 'Processing';
+      case 'shipped':
+        return 'Shipped';
+      case 'confirmed':
+        return 'Delivered';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status.toUpperCase();
+    }
+  }
+
+  String _formatDate(Timestamp? timestamp) {
+    if (timestamp == null) return '-';
+    final dt = timestamp.toDate();
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   List<QueryDocumentSnapshot> _applyFilter(List<QueryDocumentSnapshot> docs) {
     final query = _searchController.text.trim().toLowerCase();
 
-    var result = docs.where((doc) {
+    final result = docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
-      final partName = (data['partName'] ?? '').toString().toLowerCase();
+      final firstItem = _firstItem(data);
+
+      final partName = (firstItem['partName'] ?? '').toString().toLowerCase();
       final customerName = (data['customerName'] ?? '')
           .toString()
           .toLowerCase();
-      final type = (data['type'] ?? '').toString().toLowerCase();
       final status = (data['status'] ?? '').toString().toLowerCase();
+      final invoiceNumber = (data['invoiceNumber'] ?? '')
+          .toString()
+          .toLowerCase();
+      final displayStatus = status == 'confirmed' ? 'delivered' : status;
 
       final matchesSearch =
           query.isEmpty ||
           partName.contains(query) ||
           customerName.contains(query) ||
-          type.contains(query) ||
-          status.contains(query);
+          status.contains(query) ||
+          displayStatus.contains(query) ||
+          invoiceNumber.contains(query);
 
       if (!matchesSearch) return false;
-
       if (_filter == 'All') return true;
-      return status == _filter.toLowerCase();
+      return status == _mapFilterToStatus(_filter);
     }).toList();
 
     result.sort((a, b) {
@@ -72,25 +148,6 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
     });
 
     return result;
-  }
-
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'confirmed':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _formatDate(Timestamp? timestamp) {
-    if (timestamp == null) return '-';
-    final dt = timestamp.toDate();
-    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   Widget _buildFilterChip(String label) {
@@ -121,78 +178,12 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
         ),
         child: Text(
           label,
-          textAlign: TextAlign.center,
           style: GoogleFonts.poppins(
             color: selected ? Colors.white : onSurface,
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            height: 1.0,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(int count) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.20),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.shopping_cart_checkout_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Parts Orders',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$count orders available',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white.withOpacity(0.88),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -235,15 +226,14 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
 
           return Column(
             children: [
-              _buildHeader(filtered.length),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                 child: TextField(
                   controller: _searchController,
                   onChanged: (_) => setState(() {}),
                   style: GoogleFonts.poppins(),
                   decoration: InputDecoration(
-                    hintText: 'Search customer, part, type, status...',
+                    hintText: 'Search customer, part, status, invoice...',
                     hintStyle: GoogleFonts.poppins(color: Colors.grey[600]),
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
@@ -259,7 +249,6 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
               SizedBox(
                 height: 42,
                 child: ListView(
@@ -270,7 +259,13 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
                     const SizedBox(width: 8),
                     _buildFilterChip('Pending'),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Confirmed'),
+                    _buildFilterChip('Processing'),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('Shipped'),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('Delivered'),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('Completed'),
                     const SizedBox(width: 8),
                     _buildFilterChip('Cancelled'),
                   ],
@@ -326,7 +321,7 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(14),
                                     child: Image.network(
-                                      (data['imageUrl'] ?? '').toString(),
+                                      _imageUrl(data),
                                       width: 72,
                                       height: 72,
                                       fit: BoxFit.cover,
@@ -347,8 +342,7 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          (data['partName'] ?? 'Part')
-                                              .toString(),
+                                          _partName(data),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: GoogleFonts.poppins(
@@ -367,10 +361,19 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          'Qty: ${_toInt(data['quantity'])} • RM ${_toDouble(data['totalPrice']).toStringAsFixed(2)}',
+                                          '${_toInt(data['itemCount'] ?? 1)} item(s) • RM ${_toDouble(data['totalAmount'] ?? 0).toStringAsFixed(2)}',
                                           style: GoogleFonts.poppins(
                                             fontSize: 12,
                                             color: Colors.grey[700],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          (data['invoiceNumber'] ?? '-')
+                                              .toString(),
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 11,
+                                            color: Colors.grey[600],
                                           ),
                                         ),
                                         const SizedBox(height: 8),
@@ -388,7 +391,7 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
                                             ),
                                           ),
                                           child: Text(
-                                            status.toUpperCase(),
+                                            _statusLabel(status),
                                             style: GoogleFonts.poppins(
                                               fontSize: 10.5,
                                               fontWeight: FontWeight.w700,
