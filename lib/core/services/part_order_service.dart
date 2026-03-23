@@ -56,6 +56,37 @@ class PartOrderService {
         'invoiceNumber': invoiceNumber,
       });
 
+      // Handle both old format (single item) and new format (items array)
+      final items = orderData['items'] as List<dynamic>?;
+      String partName = '';
+      String carModel = '';
+      String imageUrl = '';
+      String type = '';
+      int quantity = 0;
+      double unitPrice = 0.0;
+      double totalPrice = 0.0;
+
+      if (items != null && items.isNotEmpty) {
+        // New format with items array
+        final firstItem = items[0] as Map<String, dynamic>;
+        partName = firstItem['partName'] ?? '';
+        carModel = firstItem['carModel'] ?? '';
+        imageUrl = firstItem['imageUrl'] ?? '';
+        type = firstItem['type'] ?? '';
+        quantity = orderData['itemCount'] ?? items.length;
+        unitPrice = (firstItem['unitPrice'] ?? 0.0).toDouble();
+        totalPrice = (orderData['totalAmount'] ?? 0.0).toDouble();
+      } else {
+        // Old format with direct fields
+        partName = orderData['partName'] ?? '';
+        carModel = orderData['carModel'] ?? '';
+        imageUrl = orderData['imageUrl'] ?? '';
+        type = orderData['type'] ?? '';
+        quantity = orderData['quantity'] ?? 0;
+        unitPrice = (orderData['unitPrice'] ?? 0.0).toDouble();
+        totalPrice = (orderData['totalPrice'] ?? 0.0).toDouble();
+      }
+
       transaction.set(invoiceRef, {
         'invoiceNumber': invoiceNumber,
         'orderId': orderId,
@@ -63,16 +94,17 @@ class PartOrderService {
         'customerName': orderData['customerName'],
         'customerEmail': orderData['customerEmail'],
         'customerPhone': orderData['customerPhone'],
-        'partId': orderData['partId'],
-        'partName': orderData['partName'],
-        'carModel': orderData['carModel'] ?? '',
-        'imageUrl': orderData['imageUrl'],
-        'type': orderData['type'],
-        'quantity': orderData['quantity'],
-        'unitPrice': orderData['unitPrice'],
-        'originalPrice': orderData['originalPrice'],
-        'salePrice': orderData['salePrice'],
-        'totalPrice': orderData['totalPrice'],
+        'items': items, // Store items array for new format
+        'partName': partName,
+        'carModel': carModel,
+        'imageUrl': imageUrl,
+        'type': type,
+        'quantity': quantity,
+        'unitPrice': unitPrice,
+        'totalPrice': totalPrice,
+        'subtotal': orderData['subtotal'] ?? totalPrice,
+        'shippingFee': orderData['shippingFee'] ?? 0.0,
+        'totalAmount': orderData['totalAmount'] ?? totalPrice,
         'status': 'issued',
         'createdAt': now,
         'pdfUrl': '',
