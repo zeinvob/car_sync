@@ -190,7 +190,7 @@ class _CustomerSupportChatPageState extends State<CustomerSupportChatPage> {
       return Scaffold(
         appBar: AppBar(
           title: Text(
-            'Chat with Admin',
+            'Chat',
             style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
           ),
         ),
@@ -216,7 +216,7 @@ class _CustomerSupportChatPageState extends State<CustomerSupportChatPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Chat with Admin',
+          'Chat',
           style: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,

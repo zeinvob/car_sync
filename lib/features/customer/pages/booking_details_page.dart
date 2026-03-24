@@ -1130,7 +1130,7 @@ class _ChatDialogState extends State<_ChatDialog> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Chat with Admin',
+                      'Chat',
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
