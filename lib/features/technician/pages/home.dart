@@ -7,7 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:car_sync/core/constants/app_colors.dart';
-//import 'package:car_sync/features/technician/widgets/job_card.dart';
+import 'package:car_sync/features/technician/widgets/job_card.dart';
 
 class TechnicianHomeScreen extends StatefulWidget {
   const TechnicianHomeScreen({super.key});
@@ -126,13 +126,12 @@ class _TechnicianHomeScreenState extends State<TechnicianHomeScreen> {
         final jobData = jobs[index].data() as Map<String, dynamic>;
         final docId = jobs[index].id;
 
-        // NO MORE RED LINE HERE! We are passing all 4 required parameters.
-        /*return JobCard(
+        return JobCard(
           jobData: jobData,
           documentId: docId,
           onStatusUpdate: () => _updateJobStatus(docId, jobData['status']),
           onCameraTap: () => _uploadJobPhoto(docId),
-        );*/
+        );
       },
     );
   }
