@@ -33,13 +33,6 @@ class _MyOrdersPageState extends State<MyOrdersPage>
   }
 
   Stream<QuerySnapshot> _getOrdersStream() {
-    debugPrint('MyOrdersPage - Getting orders for userId: $_userId');
-    if (_userId == null) {
-      debugPrint('MyOrdersPage - User ID is null!');
-      return const Stream.empty();
-    }
-    // Note: Using only where clause to avoid needing a composite index
-    // We'll sort the results locally instead
     return FirebaseFirestore.instance
         .collection('part_orders')
         .where('customerId', isEqualTo: _userId)
@@ -425,13 +418,13 @@ class _MyOrdersPageState extends State<MyOrdersPage>
       case 'pending':
         return (Colors.orange, 'Pending');
       case 'processing':
-        return (Colors.deepOrange, 'Processing');
+        return (Colors.indigo, 'Processing');
       case 'shipped':
         return (Colors.purple, 'Shipped');
       case 'confirmed':
-        return (Colors.blue, 'Delivered');
+        return (Colors.green, 'Delivered');
       case 'completed':
-        return (Colors.green, 'Completed');
+        return (Colors.teal, 'Completed');
       case 'cancelled':
         return (Colors.red, 'Cancelled');
       default:

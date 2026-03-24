@@ -26,7 +26,7 @@ class PartOrderService {
     return 'INV-$y$m$d-$stamp';
   }
 
- Future<void> confirmOrderAndCreateInvoice({
+  Future<void> confirmOrderAndCreateInvoice({
   required String orderId,
   required Map<String, dynamic> orderData,
   bool reduceStock = false,
@@ -171,6 +171,7 @@ class PartOrderService {
     },
   );
 }
+  
   Future<void> markOrderShipped({
     required String orderId,
     required Map<String, dynamic> orderData,
