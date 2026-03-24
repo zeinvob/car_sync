@@ -38,7 +38,6 @@ class JobCard extends StatelessWidget {
     String status = jobData['status']?.toLowerCase() ?? 'pending';
     String serviceType = jobData['serviceType'] ?? 'General Service';
     
-    // --- NEW: 4 STAGES OF JOB PROGRESS ---
     bool isPending = status == 'pending';
     bool isInspecting = status == 'inspecting';
     bool isRepairing = status == 'in_progress';
@@ -148,7 +147,6 @@ class JobCard extends StatelessWidget {
                   ),
                 ),
                 
-                // The Camera Button: Remains active as long as the job isn't finished!
                 if (!isCompleted) 
                   Container(
                     decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
