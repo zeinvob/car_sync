@@ -55,14 +55,13 @@ class OrderStatusWidget extends StatelessWidget {
       case 'pending':
         return Colors.orange;
       case 'processing':
-        return Colors.blue;
-      case 'confirmed':
-      case 'delivered':
-        return Colors.green;
+        return Colors.indigo;
       case 'shipped':
-        return Colors.teal;
+        return Colors.purple;
+      case 'confirmed':
+        return Colors.green;
       case 'completed':
-        return Colors.green.shade700;
+        return Colors.teal;
       case 'cancelled':
         return Colors.red;
       default:
@@ -75,16 +74,15 @@ class OrderStatusWidget extends StatelessWidget {
       case 'pending':
         return Icons.access_time;
       case 'processing':
-        return Icons.autorenew;
-      case 'confirmed':
-      case 'delivered':
-        return Icons.check_circle_outline;
+        return Icons.precision_manufacturing;
       case 'shipped':
-        return Icons.local_shipping_outlined;
+        return Icons.local_shipping;
+      case 'confirmed':
+        return Icons.inventory;
       case 'completed':
         return Icons.done_all;
       case 'cancelled':
-        return Icons.cancel_outlined;
+        return Icons.cancel;
       default:
         return Icons.info_outline;
     }
@@ -96,11 +94,9 @@ class OrderStatusWidget extends StatelessWidget {
         return 'Pending';
       case 'processing':
         return 'Processing';
-      case 'confirmed':
-        return 'Delivered';
       case 'shipped':
         return 'Shipped';
-      case 'delivered':
+      case 'confirmed':
         return 'Delivered';
       case 'completed':
         return 'Completed';

@@ -33,13 +33,6 @@ class _MyOrdersPageState extends State<MyOrdersPage>
   }
 
   Stream<QuerySnapshot> _getOrdersStream() {
-    debugPrint('MyOrdersPage - Getting orders for userId: $_userId');
-    if (_userId == null) {
-      debugPrint('MyOrdersPage - User ID is null!');
-      return const Stream.empty();
-    }
-    // Note: Using only where clause to avoid needing a composite index
-    // We'll sort the results locally instead
     return FirebaseFirestore.instance
         .collection('part_orders')
         .where('customerId', isEqualTo: _userId)
@@ -153,10 +146,11 @@ class _MyOrdersPageState extends State<MyOrdersPage>
                   final status = (data['status'] ?? '')
                       .toString()
                       .toLowerCase();
+
                   return status == 'pending' ||
-                      status == 'confirmed' ||
                       status == 'processing' ||
-                      status == 'shipped';
+                      status == 'shipped' ||
+                      status == 'confirmed';
                 }).toList();
 
                 debugPrint(
@@ -168,9 +162,8 @@ class _MyOrdersPageState extends State<MyOrdersPage>
                   final status = (data['status'] ?? '')
                       .toString()
                       .toLowerCase();
-                  return status == 'completed' ||
-                      status == 'delivered' ||
-                      status == 'cancelled';
+
+                  return status == 'completed' || status == 'cancelled';
                 }).toList();
 
                 return TabBarView(
@@ -424,13 +417,11 @@ class _MyOrdersPageState extends State<MyOrdersPage>
     switch (status) {
       case 'pending':
         return (Colors.orange, 'Pending');
-      case 'confirmed':
-        return (Colors.blue, 'Confirmed');
       case 'processing':
         return (Colors.indigo, 'Processing');
       case 'shipped':
         return (Colors.purple, 'Shipped');
-      case 'delivered':
+      case 'confirmed':
         return (Colors.green, 'Delivered');
       case 'completed':
         return (Colors.teal, 'Completed');

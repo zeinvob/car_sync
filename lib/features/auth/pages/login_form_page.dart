@@ -9,7 +9,7 @@ import 'package:car_sync/core/constants/app_colors.dart';
 import 'package:car_sync/core/widgets/gradient_button.dart';
 import 'package:car_sync/features/auth/pages/verify_email_page.dart';
 import 'package:car_sync/features/auth/pages/complete_profile_page.dart';
-import 'package:car_sync/features/admin/admin_home_scr.dart';
+import 'package:car_sync/features/admin/pages/admin_home_scr.dart';
 import 'package:car_sync/features/customer/pages/home.dart';
 import 'package:car_sync/main.dart';
 

@@ -38,6 +38,7 @@ class JobCard extends StatelessWidget {
     String status = jobData['status']?.toLowerCase() ?? 'pending';
     String serviceType = jobData['serviceType'] ?? 'General Service';
     
+    // --- NEW: 4 STAGES OF JOB PROGRESS ---
     bool isPending = status == 'pending';
     bool isInspecting = status == 'inspecting';
     bool isRepairing = status == 'in_progress';
@@ -126,6 +127,7 @@ class JobCard extends StatelessWidget {
                 );
               }
             ),
+            
             const SizedBox(height: 8),
             Text('Issue: $serviceType', style: GoogleFonts.poppins(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.w500)),
             const SizedBox(height: 16),
@@ -145,7 +147,8 @@ class JobCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   ),
                 ),
-
+                
+                // The Camera Button: Remains active as long as the job isn't finished!
                 if (!isCompleted) 
                   Container(
                     decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),

@@ -194,7 +194,6 @@ class UserService {
     }
   }
 
-
 /// Update user data / profile
 Future<void> updateUserData({
   required String uid,
