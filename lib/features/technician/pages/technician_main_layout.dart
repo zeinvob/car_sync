@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:car_sync/core/constants/app_colors.dart';
+
 import 'package:car_sync/features/technician/pages/home.dart';
 import 'package:car_sync/features/technician/pages/inventory_page.dart';
 import 'package:car_sync/features/technician/pages/profile_page.dart';
@@ -11,46 +14,75 @@ class TechnicianMainLayout extends StatefulWidget {
 }
 
 class _TechnicianMainLayoutState extends State<TechnicianMainLayout> {
-  int _currentIndex = 0;
+  int _selectedIndex = 0;
 
-  // --- FIXED THESE NAMES TO MATCH YOUR CLASSES ---
-  final List<Widget> _pages = [
-    const TechnicianHomeScreen(), // Correct (matches home.dart)
-    const InventoryPage(),        // FIXED (matches the fixed inventory_page.dart)
-    const TechnicianProfilePage(),          // FIXED (check if yours is ProfilePage or TechnicianProfilePage)
+  /// 🔥 KEEP PAGES ALIVE (GOOD PRACTICE)
+  late final List<Widget> _pages = [
+    const TechnicianHomeScreen(),
+    const InventoryPage(),
+    const TechnicianProfilePage(),
   ];
+
+  void _onItemTapped(int index) {
+    if (_selectedIndex == index) return; // prevent unnecessary rebuild
+    setState(() => _selectedIndex = index);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        selectedItemColor: Colors.blueAccent,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.build_circle_outlined),
-            activeIcon: Icon(Icons.build_circle),
-            label: 'Jobs',
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
+      ),
+
+      /// 🔥 MODERN NAV BAR
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: Colors.grey,
+
+          selectedLabelStyle: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            activeIcon: Icon(Icons.inventory_2),
-            label: 'Parts',
+          unselectedLabelStyle: GoogleFonts.poppins(
+            fontSize: 12,
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.assignment_outlined),
+              activeIcon: Icon(Icons.assignment),
+              label: 'Jobs',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
+              activeIcon: Icon(Icons.inventory_2),
+              label: 'Inventory',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }
