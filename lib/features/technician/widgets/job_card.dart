@@ -126,7 +126,6 @@ class JobCard extends StatelessWidget {
                 );
               }
             ),
-            
             const SizedBox(height: 8),
             Text('Issue: $serviceType', style: GoogleFonts.poppins(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.w500)),
             const SizedBox(height: 16),
@@ -146,7 +145,7 @@ class JobCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   ),
                 ),
-                
+
                 if (!isCompleted) 
                   Container(
                     decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
