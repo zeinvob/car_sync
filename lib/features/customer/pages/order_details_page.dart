@@ -37,13 +37,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Icons.hourglass_empty,
           'Your order is waiting to be processed',
         );
-      case 'confirmed':
-        return (
-          Colors.green,
-          'Delivered',
-          Icons.local_shipping,
-          'Your order has been delivered. Please confirm receipt.',
-        );
       case 'processing':
         return (
           Colors.indigo,
@@ -56,9 +49,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Colors.purple,
           'Shipped',
           Icons.local_shipping,
-          'Your order is on the way',
+          'Your order is on its way',
         );
-      case 'delivered':
+      case 'confirmed':
         return (
           Colors.green,
           'Delivered',
@@ -71,13 +64,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           'Completed',
           Icons.task_alt,
           'Order completed. Thank you for your purchase!',
-        );
-      case 'cancelled':
-        return (
-          Colors.red,
-          'Cancelled',
-          Icons.cancel,
-          'This order has been cancelled',
         );
       default:
         return (
@@ -93,13 +79,11 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     switch (status) {
       case 'pending':
         return (Colors.orange, 'Pending');
-      case 'confirmed':
-        return (Colors.blue, 'Confirmed');
       case 'processing':
         return (Colors.indigo, 'Processing');
       case 'shipped':
         return (Colors.purple, 'Shipped');
-      case 'delivered':
+      case 'confirmed':
         return (Colors.green, 'Delivered');
       case 'completed':
         return (Colors.teal, 'Completed');
@@ -116,13 +100,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         return 0;
       case 'processing':
         return 1;
-      case 'confirmed':
       case 'shipped':
-      case 'delivered':
-      case 'completed':
         return 2;
-      case 'cancelled':
-        return -1;
+      case 'confirmed':
+        return 3;
+      case 'completed':
+        return 4;
       default:
         return 0;
     }
@@ -187,8 +170,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 _buildProgressStep(
                   0,
                   currentStep,
-                  'Placed',
-                  Icons.receipt_long,
+                  'Pending',
+                  Icons.hourglass_empty,
                 ),
                 _buildProgressLine(currentStep >= 1),
                 _buildProgressStep(
@@ -201,8 +184,15 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 _buildProgressStep(
                   2,
                   currentStep,
+                  'Shipped',
+                  Icons.local_shipping,
+                ),
+                _buildProgressLine(currentStep >= 3),
+                _buildProgressStep(
+                  3,
+                  currentStep,
                   'Delivered',
-                  Icons.check_circle,
+                  Icons.inventory,
                 ),
               ],
             ),
@@ -887,7 +877,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
     final (statusColor, statusLabel) = _getStatusStyle(status);
 
-    // Check if order is confirmed (delivered) and customer can confirm receipt
+    // Check if order is delivered and customer can confirm receipt
     final canConfirmReceived = status == 'confirmed';
 
     return Scaffold(
@@ -1003,7 +993,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
-                                Icons.local_shipping,
+                                Icons.inventory,
                                 color: Colors.green.shade700,
                                 size: 24,
                               ),

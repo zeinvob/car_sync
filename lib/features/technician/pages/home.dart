@@ -126,7 +126,6 @@ class _TechnicianHomeScreenState extends State<TechnicianHomeScreen> {
         final jobData = jobs[index].data() as Map<String, dynamic>;
         final docId = jobs[index].id;
 
-        // NO MORE RED LINE HERE! We are passing all 4 required parameters.
         return JobCard(
           jobData: jobData,
           documentId: docId,

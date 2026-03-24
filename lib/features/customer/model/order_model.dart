@@ -79,29 +79,21 @@ class OrderModel {
 
   /// Check if order is active
   bool get isActive {
-    return ['pending', 'processing', 'confirmed', 'shipped'].contains(status);
+    return ['pending', 'confirmed'].contains(status);
   }
 
-  /// Check if order can be confirmed as received
-  bool get canConfirmReceived => status == 'confirmed';
+  /// Check if order can be marked as completed
+  bool get canComplete => status == 'confirmed';
 
   /// Get status display label
   String get statusLabel {
     switch (status) {
       case 'pending':
         return 'Pending';
-      case 'processing':
-        return 'Processing';
       case 'confirmed':
-        return 'Delivered';
-      case 'shipped':
-        return 'Shipped';
-      case 'delivered':
-        return 'Delivered';
+        return 'Confirmed';
       case 'completed':
         return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
       default:
         return status.toUpperCase();
     }

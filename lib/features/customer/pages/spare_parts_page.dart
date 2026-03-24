@@ -900,7 +900,6 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
   @override
   Widget build(BuildContext context) {
     final partName = widget.part['part'] ?? 'Unknown Part';
-    final carModel = widget.part['car_model'] ?? 'Universal';
     final description =
         widget.part['description'] ?? 'No description available';
     final originalPrice =
@@ -1003,8 +1002,6 @@ class _PartDetailsSheetState extends State<_PartDetailsSheet> {
           const SizedBox(height: 20),
 
           // Details
-          _buildDetailRow(Icons.directions_car, 'Compatible with', carModel),
-          const SizedBox(height: 12),
           _buildDetailRow(
             Icons.description_outlined,
             'Description',

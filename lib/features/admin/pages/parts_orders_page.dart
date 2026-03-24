@@ -12,8 +12,8 @@ class PartsOrdersPage extends StatefulWidget {
 }
 
 class _PartsOrdersPageState extends State<PartsOrdersPage> {
-  final CollectionReference _ordersCollection = FirebaseFirestore.instance
-      .collection('part_orders');
+  final CollectionReference _ordersCollection =
+      FirebaseFirestore.instance.collection('part_orders');
 
   final TextEditingController _searchController = TextEditingController();
   String _filter = 'All';
@@ -32,32 +32,133 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
   double _toDouble(dynamic value) {
     if (value is int) return value.toDouble();
     if (value is double) return value;
-    return double.tryParse('$value') ?? 0;
+    return double.tryParse('$value') ?? 0.0;
+  }
+
+  Map<String, dynamic> _firstItem(Map<String, dynamic> data) {
+    final items = data['items'] as List<dynamic>? ?? [];
+    if (items.isNotEmpty) {
+      return Map<String, dynamic>.from(items.first as Map<String, dynamic>);
+    }
+    return {};
+  }
+
+  List<dynamic> _items(Map<String, dynamic> data) {
+    return data['items'] as List<dynamic>? ?? [];
+  }
+
+  String _partName(Map<String, dynamic> data) {
+    final items = _items(data);
+    final item = _firstItem(data);
+
+    if (items.length <= 1) {
+      return (item['partName'] ?? data['partName'] ?? 'Part').toString();
+    }
+
+    return '${(item['partName'] ?? 'Part').toString()} + ${items.length - 1} more';
+  }
+
+  String _imageUrl(Map<String, dynamic> data) {
+    final item = _firstItem(data);
+    return (item['imageUrl'] ?? data['imageUrl'] ?? '').toString();
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'processing':
+        return Colors.indigo;
+      case 'shipped':
+        return Colors.purple;
+      case 'confirmed':
+        return Colors.green;
+      case 'completed':
+        return Colors.teal;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _mapFilterToStatus(String filter) {
+    switch (filter.toLowerCase()) {
+      case 'delivered':
+        return 'confirmed';
+      default:
+        return filter.toLowerCase();
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'Pending';
+      case 'processing':
+        return 'Processing';
+      case 'shipped':
+        return 'Shipped';
+      case 'confirmed':
+        return 'Delivered';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status.toUpperCase();
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Icons.hourglass_top_rounded;
+      case 'processing':
+        return Icons.precision_manufacturing_rounded;
+      case 'shipped':
+        return Icons.local_shipping_rounded;
+      case 'confirmed':
+        return Icons.inventory_rounded;
+      case 'completed':
+        return Icons.task_alt_rounded;
+      case 'cancelled':
+        return Icons.cancel_rounded;
+      default:
+        return Icons.info_outline_rounded;
+    }
+  }
+
+  String _formatDate(Timestamp? timestamp) {
+    if (timestamp == null) return '-';
+    final dt = timestamp.toDate();
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   List<QueryDocumentSnapshot> _applyFilter(List<QueryDocumentSnapshot> docs) {
     final query = _searchController.text.trim().toLowerCase();
 
-    var result = docs.where((doc) {
+    final result = docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
-      final partName = (data['partName'] ?? '').toString().toLowerCase();
-      final customerName = (data['customerName'] ?? '')
-          .toString()
-          .toLowerCase();
-      final type = (data['type'] ?? '').toString().toLowerCase();
+      final firstItem = _firstItem(data);
+
+      final partName = (firstItem['partName'] ?? '').toString().toLowerCase();
+      final customerName = (data['customerName'] ?? '').toString().toLowerCase();
       final status = (data['status'] ?? '').toString().toLowerCase();
+      final invoiceNumber = (data['invoiceNumber'] ?? '').toString().toLowerCase();
+      final displayStatus = status == 'confirmed' ? 'delivered' : status;
 
       final matchesSearch =
           query.isEmpty ||
           partName.contains(query) ||
           customerName.contains(query) ||
-          type.contains(query) ||
-          status.contains(query);
+          status.contains(query) ||
+          displayStatus.contains(query) ||
+          invoiceNumber.contains(query);
 
       if (!matchesSearch) return false;
-
       if (_filter == 'All') return true;
-      return status == _filter.toLowerCase();
+      return status == _mapFilterToStatus(_filter);
     }).toList();
 
     result.sort((a, b) {
@@ -74,37 +175,16 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
     return result;
   }
 
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'confirmed':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _formatDate(Timestamp? timestamp) {
-    if (timestamp == null) return '-';
-    final dt = timestamp.toDate();
-    return '${dt.day}/${dt.month}/${dt.year}';
-  }
-
   Widget _buildFilterChip(String label) {
     final selected = _filter == label;
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
-    return InkWell(
+    return GestureDetector(
       onTap: () => setState(() => _filter = label),
-      borderRadius: BorderRadius.circular(999),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        alignment: Alignment.center,
+        duration: const Duration(milliseconds: 220),
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           gradient: selected
               ? const LinearGradient(
@@ -116,80 +196,322 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
           border: Border.all(
             color: selected
                 ? Colors.transparent
-                : AppColors.primary.withOpacity(0.12),
+                : AppColors.primary.withOpacity(0.10),
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.20),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
-          textAlign: TextAlign.center,
           style: GoogleFonts.poppins(
             color: selected ? Colors.white : onSurface,
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            height: 1.0,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(int count) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget _buildTopSummary(List<QueryDocumentSnapshot> docs) {
+    int pending = 0;
+    int active = 0;
+    int completed = 0;
+
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final status = (data['status'] ?? '').toString().toLowerCase();
+
+      if (status == 'pending') pending++;
+      if (status == 'pending' ||
+          status == 'processing' ||
+          status == 'shipped' ||
+          status == 'confirmed') {
+        active++;
+      }
+      if (status == 'completed') completed++;
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: _summaryCard(
+            title: 'Pending',
+            value: '$pending',
+            icon: Icons.hourglass_top_rounded,
+            color: Colors.orange,
+          ),
         ),
-        borderRadius: BorderRadius.circular(24),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _summaryCard(
+            title: 'Active',
+            value: '$active',
+            icon: Icons.local_shipping_rounded,
+            color: Colors.indigo,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _summaryCard(
+            title: 'Done',
+            value: '$completed',
+            icon: Icons.task_alt_rounded,
+            color: Colors.teal,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _summaryCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.20),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: onSurface.withOpacity(0.05)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: onSurface.withOpacity(0.60),
+            ),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.shopping_cart_checkout_rounded,
-              color: Colors.white,
-              size: 28,
+    );
+  }
+
+  Widget _buildOrderCard(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final status = (data['status'] ?? 'pending').toString();
+    final imageUrl = _imageUrl(data);
+    final itemCount = _toInt(data['itemCount'] ?? 1);
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PartOrderDetailsPage(
+              orderId: doc.id,
+              orderData: data,
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Parts Orders',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
+        );
+      },
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Hero(
+              tag: 'part-order-${doc.id}',
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: imageUrl.isNotEmpty
+                    ? Image.network(
+                        imageUrl,
+                        width: 84,
+                        height: 84,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 84,
+                          height: 84,
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.inventory_2_outlined),
+                        ),
+                      )
+                    : Container(
+                        width: 84,
+                        height: 84,
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.inventory_2_outlined),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _partName(data),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _statusColor(status).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _statusIcon(status),
+                              size: 13,
+                              color: _statusColor(status),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              _statusLabel(status),
+                              style: GoogleFonts.poppins(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: _statusColor(status),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$count orders available',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white.withOpacity(0.88),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: 8),
+                  Text(
+                    (data['customerName'] ?? 'Customer').toString(),
+                    style: GoogleFonts.poppins(
+                      fontSize: 12.2,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _miniInfoChip(
+                        icon: Icons.layers_rounded,
+                        text: '$itemCount item${itemCount > 1 ? 's' : ''}',
+                      ),
+                      const SizedBox(width: 8),
+                      _miniInfoChip(
+                        icon: Icons.payments_outlined,
+                        text: 'RM ${_toDouble(data['totalAmount']).toStringAsFixed(2)}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.receipt_long_outlined, size: 14, color: Colors.grey[600]),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          (data['invoiceNumber'] ?? '-').toString(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.2,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _formatDate(data['createdAt'] as Timestamp?),
+                        style: GoogleFonts.poppins(
+                          fontSize: 10.8,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniInfoChip({
+    required IconData icon,
+    required String text,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppColors.primary),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 10.8,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
             ),
           ),
         ],
@@ -235,25 +557,97 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
 
           return Column(
             children: [
-              _buildHeader(filtered.length),
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.20),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.shopping_cart_checkout_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Order Management',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${filtered.length} orders found',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white.withOpacity(0.88),
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: _buildTopSummary(docs),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                 child: TextField(
                   controller: _searchController,
                   onChanged: (_) => setState(() {}),
                   style: GoogleFonts.poppins(),
                   decoration: InputDecoration(
-                    hintText: 'Search customer, part, type, status...',
+                    hintText: 'Search customer, part, status, invoice...',
                     hintStyle: GoogleFonts.poppins(color: Colors.grey[600]),
-                    prefixIcon: const Icon(Icons.search),
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _searchController.text.isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
                     filled: true,
                     fillColor: Theme.of(context).cardColor,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 14,
-                      vertical: 14,
+                      vertical: 15,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
                     ),
                   ),
@@ -261,17 +655,17 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
               ),
               const SizedBox(height: 12),
               SizedBox(
-                height: 42,
+                height: 44,
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   scrollDirection: Axis.horizontal,
                   children: [
                     _buildFilterChip('All'),
-                    const SizedBox(width: 8),
                     _buildFilterChip('Pending'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Confirmed'),
-                    const SizedBox(width: 8),
+                    _buildFilterChip('Processing'),
+                    _buildFilterChip('Shipped'),
+                    _buildFilterChip('Delivered'),
+                    _buildFilterChip('Completed'),
                     _buildFilterChip('Cancelled'),
                   ],
                 ),
@@ -282,138 +676,17 @@ class _PartsOrdersPageState extends State<PartsOrdersPage> {
                     ? Center(
                         child: Text(
                           'No part orders found.',
-                          style: GoogleFonts.poppins(color: Colors.grey[600]),
+                          style: GoogleFonts.poppins(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
                         ),
                       )
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                         itemCount: filtered.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final doc = filtered[index];
-                          final data = doc.data() as Map<String, dynamic>;
-                          final status = (data['status'] ?? 'pending')
-                              .toString();
-
-                          return InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PartOrderDetailsPage(
-                                    orderId: doc.id,
-                                    orderData: data,
-                                  ),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).cardColor,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Image.network(
-                                      (data['imageUrl'] ?? '').toString(),
-                                      width: 72,
-                                      height: 72,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Container(
-                                        width: 72,
-                                        height: 72,
-                                        color: Colors.grey.shade200,
-                                        child: const Icon(
-                                          Icons.inventory_2_outlined,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          (data['partName'] ?? 'Part')
-                                              .toString(),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          (data['customerName'] ?? 'Customer')
-                                              .toString(),
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 12,
-                                            color: Colors.grey[700],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Qty: ${_toInt(data['quantity'])} • RM ${_toDouble(data['totalPrice']).toStringAsFixed(2)}',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 12,
-                                            color: Colors.grey[700],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 5,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: _statusColor(
-                                              status,
-                                            ).withOpacity(0.10),
-                                            borderRadius: BorderRadius.circular(
-                                              999,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            status.toUpperCase(),
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 10.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: _statusColor(status),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _formatDate(
-                                      data['createdAt'] as Timestamp?,
-                                    ),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 10.5,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                        itemBuilder: (context, index) => _buildOrderCard(filtered[index]),
                       ),
               ),
             ],
