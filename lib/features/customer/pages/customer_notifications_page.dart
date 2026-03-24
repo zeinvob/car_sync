@@ -1,6 +1,7 @@
 import 'package:car_sync/core/services/notification_service.dart';
 import 'package:car_sync/features/customer/pages/booking_details_page.dart';
 import 'package:car_sync/features/customer/pages/my_orders_page.dart';
+import 'package:car_sync/features/customer/pages/order_details_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -63,6 +64,12 @@ class _CustomerNotificationsPageState extends State<CustomerNotificationsPage> {
         return Icons.cancel_outlined;
       case 'part_order_status':
         return Icons.local_shipping_outlined;
+      case 'order_processing':
+        return Icons.precision_manufacturing;
+      case 'order_shipped':
+        return Icons.local_shipping;
+      case 'order_delivered':
+        return Icons.inventory;
       default:
         return Icons.notifications_outlined;
     }
@@ -420,10 +427,45 @@ class _NotificationItemState extends State<_NotificationItem> {
             final String? newStatus = extraData['newStatus']?.toString();
             final String notificationType = widget.type;
 
-            // Handle invoice_created and part_order notifications
+            // Handle order-related notifications (processing, shipped, delivered, etc.)
             if (notificationType == 'invoice_created' || 
                 notificationType == 'part_order_cancelled' ||
-                notificationType == 'part_order_status') {
+                notificationType == 'part_order_status' ||
+                notificationType == 'order_processing' ||
+                notificationType == 'order_shipped' ||
+                notificationType == 'order_delivered') {
+              
+              // Get the orderId from extraData
+              final String? orderId = extraData['orderId']?.toString();
+              
+              if (orderId != null && orderId.isNotEmpty && mounted) {
+                try {
+                  // Fetch the order data from Firestore
+                  final orderDoc = await FirebaseFirestore.instance
+                      .collection('part_orders')
+                      .doc(orderId)
+                      .get();
+                  
+                  if (orderDoc.exists && mounted) {
+                    final orderData = orderDoc.data()!;
+                    // Navigate to specific order details
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OrderDetailsPage(
+                          orderId: orderId,
+                          orderData: orderData,
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                } catch (e) {
+                  debugPrint('Error fetching order: $e');
+                }
+              }
+              
+              // Fallback to MyOrdersPage if orderId not found
               if (mounted) {
                 Navigator.push(
                   context,
