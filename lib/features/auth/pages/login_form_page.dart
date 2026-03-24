@@ -11,6 +11,7 @@ import 'package:car_sync/features/auth/pages/verify_email_page.dart';
 import 'package:car_sync/features/auth/pages/complete_profile_page.dart';
 import 'package:car_sync/features/admin/pages/admin_home_scr.dart';
 import 'package:car_sync/features/customer/pages/home.dart';
+import 'package:car_sync/features/technician/pages/technician_main_layout.dart';
 import 'package:car_sync/main.dart';
 
 class LoginFormPage extends StatefulWidget {
