@@ -194,7 +194,7 @@ class RoleBasedHomeLoader extends StatelessWidget {
         if (role == 'admin') {
           return const AdminThemeWrapper(child: AdminHomeScreen());
         } else if (role == 'technician' || role == 'foreman') {
-          return const TechnicianMainLayout(); // <-- CHANGED THIS LINE ONLY
+          return TechnicianMainLayout(); // <-- CHANGED THIS LINE ONLY
         } else {
           return const CustomerHomePage();
         }

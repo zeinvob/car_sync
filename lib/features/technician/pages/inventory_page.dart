@@ -17,17 +17,20 @@ class _InventoryPageState extends State<InventoryPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: Text('Workshop Inventory', 
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        title: Text(
+          'Workshop Inventory',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
       ),
       body: Column(
         children: [
-          // 1. THE SEARCH BAR
+          // SEARCH BAR
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
-              onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
+              onChanged: (value) =>
+                  setState(() => _searchQuery = value.toLowerCase()),
               decoration: InputDecoration(
                 hintText: "Search parts (e.g. Pulley, Brake)...",
                 prefixIcon: const Icon(Icons.search),
@@ -41,20 +44,25 @@ class _InventoryPageState extends State<InventoryPage> {
             ),
           ),
 
-          // 2. THE LIVE PARTS LIST
+          // LIST
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              // Matches the 'spareparts' collection from your screenshot
-              stream: FirebaseFirestore.instance.collection('spareparts').snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('spareparts')
+                  .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) return const Center(child: Text("Error loading database"));
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                if (snapshot.hasError) {
+                  return const Center(child: Text("Error loading database"));
+                }
 
-                // --- SMART CASE-INSENSITIVE FILTERING ---
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
                 final filteredDocs = snapshot.data!.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  // Looks at the 'part' field from your screenshot
-                  final partName = (data['part'] ?? '').toString().toLowerCase();
+                  final partName =
+                      (data['part'] ?? '').toString().toLowerCase();
                   return partName.contains(_searchQuery);
                 }).toList();
 
@@ -66,47 +74,79 @@ class _InventoryPageState extends State<InventoryPage> {
                   itemCount: filteredDocs.length,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemBuilder: (context, index) {
-                    var data = filteredDocs[index].data() as Map<String, dynamic>;
-                    
-                    // Mapping fields exactly to your Firestore Screenshot:
+                    var data =
+                        filteredDocs[index].data() as Map<String, dynamic>;
+
                     String partName = data['part'] ?? 'Unknown Part';
-                    String carModel = data['car model'] ?? 'All Models';
+                    String carModel = data['carModel'] ?? 'All Models';
                     String imageUrl = data['imageUrl'] ?? '';
-                    int stockLevel = data['stock'] ?? 0;
-                    double price = (data['salePrice'] ?? 0.0).toDouble();
+
+                    double price = (data['salePrice'] is num)
+                        ? (data['salePrice'] as num).toDouble()
+                        : 0.0;
+
+                    int stockLevel = (data['stock'] is int)
+                        ? data['stock']
+                        : int.tryParse(data['stock'].toString()) ?? 0;
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
                       child: ListTile(
                         contentPadding: const EdgeInsets.all(12),
                         leading: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: imageUrl.isNotEmpty
-                              ? Image.network(imageUrl, width: 50, height: 50, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(Icons.settings_input_component))
-                              : Container(color: Colors.blue[50], width: 50, height: 50, child: const Icon(Icons.build)),
+                              ? Image.network(
+                                  imageUrl,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      const Icon(Icons.settings_input_component),
+                                )
+                              : Container(
+                                  color: Colors.blue[50],
+                                  width: 50,
+                                  height: 50,
+                                  child: const Icon(Icons.build),
+                                ),
                         ),
-                        title: Text(partName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                        title: Text(
+                          partName,
+                          style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold),
+                        ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text("For: $carModel", style: const TextStyle(fontSize: 12)),
-                            Text("RM ${price.toStringAsFixed(2)}", 
-                              style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                            Text("For: $carModel",
+                                style: const TextStyle(fontSize: 12)),
+                            Text(
+                              "RM ${price.toStringAsFixed(2)}",
+                              style: const TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold),
+                            ),
                           ],
                         ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            // Red warning if stock is low
-                            color: stockLevel < 10 ? Colors.red[50] : Colors.green[50],
+                            color: stockLevel < 10
+                                ? Colors.red[50]
+                                : Colors.green[50],
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             "Qty: $stockLevel",
                             style: TextStyle(
-                              color: stockLevel < 10 ? Colors.red : Colors.green,
+                              color: stockLevel < 10
+                                  ? Colors.red
+                                  : Colors.green,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
